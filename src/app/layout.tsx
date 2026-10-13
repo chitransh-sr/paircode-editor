@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Inter, JetBrains_Mono, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -45,15 +44,18 @@ export default function RootLayout({
       className={`${inter.variable} ${jetBrainsMono.variable} ${ibmPlexSans.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      {/* Apply the stored/OS theme before hydration so day/night mode
-          covers the whole site with no flash. Mirrors useTheme logic. */}
-      <Script
-        id="theme-init"
-        strategy="beforeInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark")}}catch(e){}`,
-        }}
-      />
+      <head>
+        {/* Apply the stored/OS theme before hydration so day/night mode
+            covers the whole site with no flash. Mirrors useTheme logic.
+            Plain <script> in <head> — next/script with beforeInteractive
+            cannot be a direct child of <html>. */}
+        <script
+          id="theme-init"
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark")}}catch(e){}`,
+          }}
+        />
+      </head>
       <body
         className="min-h-full flex flex-col bg-background text-foreground font-sans transition-colors duration-150"
         suppressHydrationWarning
