@@ -49,22 +49,6 @@
   --color-ring: #22C55E;
 }
 
-/* Hero flowing lines — exact replica of reference.
-   Path length is 1036.24, dash is "1036.24 1036.24" (total 2072.48),
-   so offsetting by -2072.48 loops seamlessly. 4s linear infinite. */
-@keyframes hero-line-flow-down {
-  0% {
-    stroke-dashoffset: 0;
-  }
-  to {
-    stroke-dashoffset: -2072.48px;
-  }
-}
-
-.animate-hero-line-flow {
-  animation: hero-line-flow-down 4s linear infinite;
-}
-
 /* Premium scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
