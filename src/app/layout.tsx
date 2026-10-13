@@ -41,21 +41,15 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${jetBrainsMono.variable} ${ibmPlexSans.variable} h-full antialiased`}
+      // Default to dark so SSR matches useTheme's initial 'dark' state.
+      // Theme is corrected client-side after mount (see useTheme), and
+      // suppressHydrationWarning silences the class mismatch for light users.
+      // NOTE: No <script> / next/script here on purpose — a sync/defer script
+      // as a direct child of <html> triggers hydration errors, so theme is
+      // applied in an effect instead of a blocking script (no flash for dark).
+      className={`${inter.variable} ${jetBrainsMono.variable} ${ibmPlexSans.variable} dark h-full antialiased`}
       suppressHydrationWarning
     >
-      <head>
-        {/* Apply the stored/OS theme before hydration so day/night mode
-            covers the whole site with no flash. Mirrors useTheme logic.
-            Plain <script> in <head> — next/script with beforeInteractive
-            cannot be a direct child of <html>. */}
-        <script
-          id="theme-init"
-          dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark")}}catch(e){}`,
-          }}
-        />
-      </head>
       <body
         className="min-h-full flex flex-col bg-background text-foreground font-sans transition-colors duration-150"
         suppressHydrationWarning
