@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Plus, Users, CodeXml } from "lucide-react";
 import type { Room } from "@/types/room";
+import { HeroLines } from "@/components/hero/hero-lines";
 import { RoomDashboard } from "@/components/room/room-dashboard";
 
 export default function HomePage() {
@@ -18,6 +19,8 @@ export default function HomePage() {
 
   return (
     <main className="relative min-h-screen bg-background overflow-hidden">
+      {/* Animated hero lines (isometric grid + flowing S-curves) */}
+      <HeroLines />
       {/* Subtle OLED glow effect */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-accent/15 rounded-full blur-[80px]" />
