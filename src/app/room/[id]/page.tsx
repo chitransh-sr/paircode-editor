@@ -1,0 +1,439 @@
+'use client';
+
+import { useState, useEffect, useCallback, use, useRef, useId } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2, AlertCircle, RefreshCw, Trash2, Check, Wand2, Eye } from "lucide-react";
+import { RoomHeader } from "@/components/room/room-header";
+import { JoinModal } from "@/components/room/join-modal";
+import { CodeEditor, type CodeEditorHandle } from "@/components/editor/code-editor";
+import { RunButton } from "@/components/editor/run-button";
+import { ConsolePanel } from "@/components/output/console-panel";
+import { PreviewPanel } from "@/components/output/preview-panel";
+import { PresenceBar } from "@/components/editor/presence-bar";
+import { useRoom } from "@/hooks/use-room";
+import { useLocalStorage } from "@/hooks/use-mobile";
+import { useExecution } from "@/hooks/use-execution";
+import { getLanguage, FORMATTABLE_LANGUAGES } from "@/lib/execute/languages";
+import { buildPreviewHtml, stripTypeScript, previewError } from "@/lib/preview/build";
+import { getUserColor } from "@/lib/presence/colors";
+import type { Room } from "@/types/room";
+import type { UserPresence } from "@/types/presence";
+import { cn } from "@/lib/utils/cn";
+
+export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter();
+
+  // Unwrap params - Next.js 15+ requires this
+  const resolvedParams = use(params);
+  const roomId = resolvedParams?.id;
+
+  const {
+    room: fetchedRoom,
+    isLoading,
+    error: roomError,
+    updateRoom: fetchRoomUpdate,
+  } = useRoom(roomId);
+
+  const [userName, setUserName] = useLocalStorage<string>("editor-user-name", "");
+  // Start closed/empty to match SSR HTML; storage is read after mount.
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [userColor, setUserColor] = useState("");
+  const [code, setCode] = useState("");
+  const [activeUsers, setActiveUsers] = useState<UserPresence[]>([]);
+  const [snapshotSaved, setSnapshotSaved] = useState(false);
+  const [formatting, setFormatting] = useState(false);
+  const [formatMsg, setFormatMsg] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const editorRef = useRef<CodeEditorHandle | null>(null);
+  const lastLangRef = useRef<string | null>(null);
+
+  // Use execution hook at the page level so the result reaches the console
+  const { execute, isExecuting, result: executionResult, clearResult } = useExecution();
+
+  // Stable user identity (useId is SSR-safe, unlike Date.now())
+  const currentUserId = useId();
+
+  // Derived error: combine hook error and roomId validation
+  const error = roomError?.message || (!roomId && !roomError && !isLoading ? "Room ID not provided" : null);
+
+  const room = fetchedRoom;
+
+  // Seed the runnable code with the language default on first load and on
+  // language switch (unless the user already typed custom code).
+  // Closes the preview pane when switching to a non-previewable language.
+  useEffect(() => {
+    if (!room) return;
+    const langKey = room.language;
+    if (lastLangRef.current === langKey) return;
+    const prevDefault = lastLangRef.current
+      ? getLanguage(lastLangRef.current)?.defaultCode ?? ""
+      : "";
+    lastLangRef.current = langKey;
+    const nextDefault = getLanguage(langKey)?.defaultCode ?? "";
+    setCode((prev) => (prev === "" || prev === prevDefault ? nextDefault : prev));
+    if (!getLanguage(langKey)?.preview) {
+      setPreviewOpen(false);
+      setPreviewHtml(null);
+    }
+  }, [room]);
+
+  const handleJoin = (name: string, color: string) => {
+    setUserName(name);
+    setUserColor(color);
+    localStorage.setItem("editor-user-name", name);
+    localStorage.setItem("editor-user-color", color);
+    setShowJoinModal(false);
+  };
+
+  const handleRoomUpdate = useCallback(
+    (updatedRoom: Room) => {
+      // Persist to database (updates fetchedRoom via useRoom hook)
+      fetchRoomUpdate({
+        language: updatedRoom.language,
+        theme: updatedRoom.theme,
+        is_read_only: updatedRoom.is_read_only,
+      }).catch(console.error);
+    },
+    [fetchRoomUpdate]
+  );
+
+  const handleCodeChange = useCallback((newCode: string) => {
+    setCode(newCode);
+  }, []);
+
+  const handlePresenceChange = useCallback((users: UserPresence[]) => {
+    setActiveUsers(users);
+  }, []);
+
+  const handleSaveSnapshot = useCallback(async () => {
+    if (!room || !code) return;
+
+    try {
+      const response = await fetch(`/api/rooms/${room.id}/snapshots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+
+      if (!response.ok) throw new Error("Failed to save snapshot");
+
+      setSnapshotSaved(true);
+      setTimeout(() => setSnapshotSaved(false), 2000);
+    } catch (err) {
+      console.error("Failed to save snapshot:", err);
+    }
+  }, [room, code]);
+
+  const handleClearConsole = useCallback(() => {
+    clearResult();
+  }, [clearResult]);
+
+  const previewSupported = !!room && !!getLanguage(room.language)?.preview;
+
+  const rebuildPreview = useCallback(async () => {
+    if (!room) return;
+    const strategy = getLanguage(room.language)?.preview;
+    if (!strategy) {
+      setPreviewHtml(null);
+      return;
+    }
+    try {
+      const source =
+        room.language === "typescript" ? await stripTypeScript(code) : code;
+      setPreviewHtml(await buildPreviewHtml(strategy, source));
+    } catch {
+      setPreviewHtml(previewError("Could not build preview."));
+    }
+  }, [room, code]);
+
+  // Live preview: rebuild debounced while typing with the preview open
+  useEffect(() => {
+    if (!previewOpen || !previewSupported) return;
+    const timer = setTimeout(() => {
+      rebuildPreview();
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [previewOpen, previewSupported, rebuildPreview]);
+
+  const canFormat = !!room && FORMATTABLE_LANGUAGES.has(room.language);
+
+  const handleFormat = useCallback(async () => {
+    if (!room || !code || formatting || !FORMATTABLE_LANGUAGES.has(room.language)) return;
+    setFormatting(true);
+    setFormatMsg(null);
+    try {
+      const response = await fetch("/api/format", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, language: room.language }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Format failed");
+      editorRef.current?.setCode(data.code);
+    } catch (err) {
+      setFormatMsg(err instanceof Error ? err.message : "Format failed");
+      setTimeout(() => setFormatMsg(null), 4000);
+    } finally {
+      setFormatting(false);
+    }
+  }, [room, code, formatting]);
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      // Ctrl/Cmd + S to save snapshot
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        handleSaveSnapshot();
+      }
+      // Ctrl/Cmd + Shift + F to format code
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "f" || e.key === "F")) {
+        e.preventDefault();
+        handleFormat();
+      }
+    },
+    [handleSaveSnapshot, handleFormat]
+  );
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
+
+  // Read identity from storage after mount (keeps first render SSR-identical)
+  useEffect(() => {
+    if (!localStorage.getItem("editor-user-name")) {
+      setShowJoinModal(true);
+    }
+    const storedColor = localStorage.getItem("editor-user-color");
+    if (storedColor) {
+      setUserColor(storedColor);
+    } else {
+      const newColor = getUserColor(Math.floor(Math.random() * 12));
+      localStorage.setItem("editor-user-color", newColor);
+      setUserColor(newColor);
+    }
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-accent mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading room...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !room) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <p className="text-foreground mb-4">{error || "Room not found"}</p>
+          <button
+            onClick={() => router.push("/")}
+            className="px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Build current user object for presence bar
+  const currentUser: UserPresence | null = userName
+    ? {
+        id: currentUserId,
+        name: userName,
+        color: userColor || getUserColor(0),
+        lastActive: new Date().toISOString(),
+      }
+    : null;
+
+  return (
+    <>
+      {/* Join Modal */}
+      <JoinModal
+        open={showJoinModal}
+        onJoin={handleJoin}
+        defaultName={userName || ""}
+      />
+
+      <div className="h-screen flex flex-col bg-background">
+        {/* Header */}
+        <RoomHeader
+          room={room}
+          userName={userName}
+          onClose={() => router.push("/")}
+          onRoomUpdate={handleRoomUpdate}
+        />
+
+        {/* Presence bar */}
+        <div className="px-3 py-1">
+          <PresenceBar users={activeUsers} currentUser={currentUser} />
+        </div>
+
+        {/* Editor + preview split area.
+            Mobile-first: stacked (editor top, preview below, scrolls if short).
+            Desktop (lg+): side-by-side halves. */}
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
+          {/* Editor (left half on desktop) */}
+          <div className="flex-1 min-h-[320px] lg:min-h-0 min-w-0 flex flex-col">
+            <div className="bg-card px-3 py-2 border-b border-border flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 overflow-x-auto py-0.5 min-w-0">
+                <div className="shrink-0">
+                  <RunButton
+                    code={code}
+                    isExecuting={isExecuting}
+                    result={executionResult}
+                    onExecute={async () => {
+                      const lang = getLanguage(room.language);
+                      if (!lang) return;
+                      // Render-only languages (HTML/CSS) open the Preview pane
+                      if (lang.name === "html" || lang.name === "css") {
+                        setPreviewOpen(true);
+                        await rebuildPreview();
+                        return;
+                      }
+                      if (!code) return;
+                      await execute(code, lang.id);
+                    }}
+                    disabled={room.is_read_only}
+                  />
+                </div>
+                <button
+                  onClick={handleSaveSnapshot}
+                  disabled={!code || room.is_read_only}
+                  className={cn(
+                    "shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                    "flex items-center gap-2",
+                    !code || room.is_read_only
+                      ? "bg-muted cursor-not-allowed text-muted-foreground"
+                      : "bg-muted hover:bg-muted/80 text-foreground"
+                  )}
+                  title="Save snapshot (Ctrl/Cmd + S)"
+                >
+                  {snapshotSaved ? (
+                    <Check className="w-4 h-4 text-accent" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                  <span className="hidden sm:inline">{snapshotSaved ? "Saved" : "Save"}</span>
+                </button>
+                <button
+                  onClick={handleClearConsole}
+                  className="shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 bg-muted hover:bg-muted/80 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  title="Clear console"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleFormat}
+                  disabled={!code || !canFormat || formatting || room.is_read_only}
+                  className={cn(
+                    "shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                    "flex items-center gap-2",
+                    !code || !canFormat || formatting || room.is_read_only
+                      ? "bg-muted cursor-not-allowed text-muted-foreground"
+                      : "bg-muted hover:bg-muted/80 text-foreground"
+                  )}
+                  title={
+                    canFormat
+                      ? "Format code (Ctrl/Cmd + Shift + F)"
+                      : `Formatting is not supported for ${getLanguage(room.language)?.label || room.language} yet`
+                  }
+                >
+                  {formatting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Wand2 className="w-4 h-4" />
+                  )}
+                  <span className="hidden sm:inline">Format</span>
+                </button>
+                <button
+                  onClick={() => setPreviewOpen((v) => !v)}
+                  disabled={!previewSupported}
+                  aria-pressed={previewOpen}
+                  className={cn(
+                    "shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                    "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                    !previewSupported
+                      ? "bg-muted cursor-not-allowed text-muted-foreground"
+                      : previewOpen
+                        ? "bg-accent/20 text-foreground hover:bg-accent/30"
+                        : "bg-muted hover:bg-muted/80 text-foreground"
+                  )}
+                  title={
+                    previewSupported
+                      ? "Toggle live preview"
+                      : "Preview is available for HTML, CSS, JavaScript, TypeScript and React"
+                  }
+                >
+                  <Eye className="w-4 h-4" />
+                  <span className="hidden sm:inline">Preview</span>
+                </button>
+                {formatMsg && (
+                  <span className="shrink-0 text-xs text-destructive max-w-32 sm:max-w-64 truncate" title={formatMsg}>
+                    {formatMsg}
+                  </span>
+                )}
+              </div>
+
+              {/* Language info */}
+              <div className="hidden md:flex text-xs text-muted-foreground/70 items-center gap-2 shrink-0">
+                {getLanguage(room.language)?.label || room.language}
+                {room.is_read_only && (
+                  <>
+                    <span>•</span>
+                    <span className="text-orange-400">Read-only</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-hidden min-h-0">
+              {/* Remount on language switch so the snippet resets to the new
+                  language default instead of showing stale code. */}
+              <CodeEditor
+                key={room.language}
+                ref={editorRef}
+                language={room.language}
+                theme={room.theme}
+                isReadOnly={room.is_read_only}
+                userName={userName}
+                userColor={userColor}
+                onNameChange={setUserName}
+                onCodeChange={handleCodeChange}
+                onPresenceChange={handlePresenceChange}
+              />
+            </div>
+          </div>
+
+          {/* Preview (right half on desktop, below editor on mobile) */}
+          {previewOpen && previewSupported && (
+            <div className="shrink-0 h-[340px] sm:h-[420px] lg:h-auto lg:w-1/2 border-t lg:border-t-0 lg:border-l border-border flex flex-col min-w-0 bg-card">
+              <PreviewPanel
+                html={previewHtml}
+                onRefresh={rebuildPreview}
+                onClose={() => setPreviewOpen(false)}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Console (always at the bottom) */}
+        <ConsolePanel
+          result={executionResult}
+          onStdinSubmit={(input) => {
+            console.log("STDIN:", input);
+          }}
+          waitingForInput={false}
+          onClear={clearResult}
+        />
+      </div>
+    </>
+  );
+}
