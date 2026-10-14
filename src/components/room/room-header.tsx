@@ -116,7 +116,7 @@ export function RoomHeader({
   }, [room.id]);
 
   return (
-    <div className="flex items-center justify-between px-4 py-2.5 bg-card border-b border-border transition-colors">
+    <div className="flex items-center justify-between gap-2 flex-wrap px-4 py-2.5 bg-card border-b border-border transition-colors">
       {/* Left: Logo & Room Info */}
       <div className="flex items-center gap-3 min-w-0">
         <span className="flex items-center gap-1.5 shrink-0">

@@ -70,10 +70,10 @@ export function PasswordGate({ room, onUnlocked }: PasswordGateProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="min-h-screen supports-[min-height:100dvh]:min-h-dvh bg-background flex items-center justify-center px-4 py-8">
       <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-background to-accent/5" />
       <div className="relative z-10 w-full max-w-md">
-        <div className="bg-card rounded-xl p-8 border border-border shadow-xl">
+        <div className="bg-card rounded-xl p-6 sm:p-8 border border-border shadow-xl">
           {/* Header */}
           <div className="text-center mb-6">
             <div className="w-16 h-16 bg-accent/15 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -120,7 +120,7 @@ export function PasswordGate({ room, onUnlocked }: PasswordGateProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter room password"
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-base sm:text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
                 autoComplete="current-password"
                 minLength={4}
                 maxLength={128}

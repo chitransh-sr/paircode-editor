@@ -49,6 +49,12 @@
   --color-ring: #22C55E;
 }
 
+/* Prevent stray horizontal scroll on small screens (fixed overlays unaffected) */
+html,
+body {
+  overflow-x: clip;
+}
+
 /* Premium scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

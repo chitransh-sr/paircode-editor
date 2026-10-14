@@ -27,8 +27,8 @@ export function LanguageSelect({ value, onChange, disabled }: LanguageSelectProp
           disabled && "opacity-50 cursor-not-allowed"
         )}
       >
-        <Globe className="w-4 h-4 text-muted-foreground" />
-        <span>{selectedLang.label}</span>
+        <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
+        <span className="hidden sm:inline">{selectedLang.label}</span>
         <span className="text-muted-foreground">▼</span>
       </button>
 

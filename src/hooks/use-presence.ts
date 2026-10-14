@@ -36,7 +36,7 @@ export function usePresence(
 
     const user: UserPresence = {
       id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: userName || `User${Math.floor(Math.random() * 1000)}`,
+      name: userName || "Anonymous",
       color: userColorRef.current,
       lastActive: new Date().toISOString(),
     };

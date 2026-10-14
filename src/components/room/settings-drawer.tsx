@@ -65,7 +65,7 @@ export function SettingsDrawer({
       {/* Drawer */}
       <div
         className={cn(
-          "fixed inset-y-0 right-0 w-80 sm:w-[360px] bg-card border-l border-border z-50 shadow-2xl",
+          "fixed inset-y-0 right-0 w-80 max-w-[calc(100vw-2rem)] sm:w-[360px] bg-card border-l border-border z-50 shadow-2xl",
           "transform transition-transform duration-300 ease-in-out flex flex-col",
           open ? "translate-x-0" : "translate-x-full"
         )}

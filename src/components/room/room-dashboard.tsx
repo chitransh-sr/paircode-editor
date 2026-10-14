@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Link2, Briefcase, GraduationCap, Loader2, Lock, ChevronDown } from "lucide-react";
 import type { Room } from "@/types/room";
-import { createRoom, verifyRoomPassword } from "@/hooks/use-room";
+import { createRoom, verifyRoomPassword, sanitizeStoredName } from "@/hooks/use-room";
 import { LANGUAGES, getLanguage } from "@/lib/execute/languages";
 import { cn } from "@/lib/utils/cn";
 
@@ -30,15 +30,7 @@ function readRecentRooms(): RecentRoom[] {
 function readStoredName(): string {
   if (typeof window === "undefined") return "";
   try {
-    const raw = localStorage.getItem("editor-user-name");
-    if (!raw) return "";
-    // Tolerate both raw strings and JSON-encoded strings
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      return typeof parsed === "string" ? parsed : raw;
-    } catch {
-      return raw;
-    }
+    return sanitizeStoredName(localStorage.getItem("editor-user-name"));
   } catch {
     return "";
   }
@@ -226,6 +218,13 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
   };
 
   const handleJoinRoom = async () => {
+    // Identity first: the exact entered name is used everywhere — no
+    // generated placeholders.
+    const name = joinName.trim();
+    if (!name) {
+      setJoinError("Enter your name to join");
+      return;
+    }
     const roomId = parseRoomId(joinInput);
     if (!roomId) {
       setJoinError("Enter a valid room link or room ID");
@@ -258,10 +257,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
     }
 
     // Not private or check failed — join directly
-    const name = joinName.trim();
-    if (name) {
-      localStorage.setItem("editor-user-name", name);
-    }
+    localStorage.setItem("editor-user-name", name);
     setJoinError("");
     setRequiresPassword(false);
     setShowJoinModal(false);
@@ -271,6 +267,11 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
   const handlePasswordSubmit = async () => {
     const roomId = parseRoomId(joinInput);
     if (!roomId || !joinPassword) return;
+    const pwdName = joinName.trim();
+    if (!pwdName) {
+      setJoinError("Enter your name to join");
+      return;
+    }
 
     setJoinError("");
     try {
@@ -285,10 +286,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
         sessionStorage.setItem(`room-verified-${roomId}`, "true");
       }
 
-      const name = joinName.trim();
-      if (name) {
-        localStorage.setItem("editor-user-name", name);
-      }
+      localStorage.setItem("editor-user-name", pwdName);
       setRequiresPassword(false);
       setShowJoinModal(false);
       setJoinPassword("");
@@ -305,7 +303,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
         <div className="text-center mb-6">
           <h2 className="text-xl font-semibold text-foreground">How are you joining today?</h2>
         </div>
-        <div className="grid sm:grid-cols-2 gap-4 mb-16">
+        <div className="grid sm:grid-cols-2 gap-4 mb-10 sm:mb-16">
           <button
             onClick={() => setShowCreateModal(true)}
             className="group text-left bg-card rounded-xl p-6 border border-border hover:border-accent hover:shadow-xl transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -346,7 +344,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
 
         {/* Recent rooms — suppressed until after first mount to avoid SSR/client mismatch */}
         {!suppressRecent && recentRooms.length > 0 && (
-          <div className="mb-20">
+          <div className="mb-12 sm:mb-20">
             <h2 className="text-lg font-semibold mb-3 text-foreground">Recent Rooms</h2>
             <div className="space-y-2">
               {recentRooms.slice(0, 5).map((room) => (
@@ -361,11 +359,11 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     {room.is_private && (
                       <Lock className="w-3 h-3 text-accent shrink-0" aria-label="Private room" />
                     )}
-                    <span className="text-sm text-muted-foreground shrink-0">{getLanguage(room.language)?.label || room.language}</span>
+                    <span className="text-sm text-muted-foreground shrink-0 hidden sm:inline">{getLanguage(room.language)?.label || room.language}</span>
                   </div>
                   <button
                     onClick={() => handleRecentJoin(room)}
-                    className="text-sm text-accent hover:text-accent/90 transition-opacity focus-visible:opacity-100 shrink-0 ml-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+                    className="text-sm text-accent hover:text-accent/90 hover:bg-accent/10 transition-colors focus-visible:opacity-100 shrink-0 ml-3 px-3 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-md"
                   >
                     Join
                   </button>
@@ -384,7 +382,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
             onClick={closeModals}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl p-6 w-full max-w-md border border-border shadow-2xl"
+            <div className="bg-card rounded-2xl p-5 sm:p-6 w-full max-w-md border border-border shadow-2xl max-h-[90dvh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-xl font-semibold mb-1 text-foreground">Create Interview Room</h2>
@@ -398,7 +396,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     value={roomName}
                     onChange={(e) => setRoomName(e.target.value)}
                     placeholder="e.g., Frontend Interview - John"
-                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition"
+                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted-foreground/60 shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition"
                     maxLength={50}
                     autoFocus
                     onKeyDown={(e) => {
@@ -416,7 +414,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     <select
                       value={selectedLanguage}
                       onChange={(e) => setSelectedLanguage(e.target.value)}
-                      className="w-full appearance-none bg-background border border-border rounded-lg pl-3.5 pr-10 py-2.5 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition cursor-pointer"
+                      className="w-full appearance-none bg-background border border-border rounded-lg pl-3.5 pr-10 py-2.5 text-base sm:text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition cursor-pointer"
                     >
                       {LANGUAGES.map((lang) => (
                         <option key={lang.id} value={lang.name}>
@@ -449,7 +447,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                       value={roomPassword}
                       onChange={(e) => setRoomPassword(e.target.value)}
                       placeholder="Minimum 4 characters"
-                      className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground font-mono placeholder:text-muted-foreground/60 placeholder:font-sans shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition"
+                      className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-foreground font-mono placeholder:text-muted-foreground/60 placeholder:font-sans shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition"
                       maxLength={128}
                       minLength={4}
                       autoComplete="new-password"
@@ -497,7 +495,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
         <div>
           <div className="fixed inset-0 bg-black/50 z-50" onClick={closeModals} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-card rounded-xl p-6 w-full max-w-md border border-border shadow-xl"
+            <div className="bg-card rounded-xl p-5 sm:p-6 w-full max-w-md border border-border shadow-xl max-h-[90dvh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="text-center mb-6">
@@ -516,7 +514,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     value={joinPassword}
                     onChange={(e) => setJoinPassword(e.target.value)}
                     placeholder="Enter room password"
-                    className="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
+                    className="w-full bg-background border border-border rounded px-3 py-2 text-base sm:text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
                     autoComplete="new-password"
                     autoFocus
                     onKeyDown={(e) => {
@@ -571,7 +569,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
             onClick={closeModals}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-card rounded-xl p-6 w-full max-w-md border border-border shadow-xl"
+            <div className="bg-card rounded-xl p-5 sm:p-6 w-full max-w-md border border-border shadow-xl max-h-[90dvh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-xl font-semibold mb-4 text-foreground">Join Interview Room</h2>
@@ -584,7 +582,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     value={joinInput}
                     onChange={(e) => setJoinInput(e.target.value)}
                     placeholder="Paste the interview link here"
-                    className="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
+                    className="w-full bg-background border border-border rounded px-3 py-2 text-base sm:text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -602,7 +600,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     value={joinName}
                     onChange={(e) => setJoinName(e.target.value)}
                     placeholder="e.g., Sarah Chen"
-                    className="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
+                    className="w-full bg-background border border-border rounded px-3 py-2 text-base sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
                     maxLength={30}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {

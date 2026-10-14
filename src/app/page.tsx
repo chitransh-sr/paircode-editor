@@ -17,19 +17,19 @@ export default function HomePage() {
   };
 
   return (
-    <main className="relative min-h-screen bg-background overflow-hidden">
+    <main className="relative min-h-screen supports-[min-height:100dvh]:min-h-dvh bg-background overflow-hidden">
       {/* Subtle OLED glow effect */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-accent/15 rounded-full blur-[80px]" />
       </div>
 
-      <div className="relative container mx-auto py-16 px-4">
+      <div className="relative container mx-auto py-10 sm:py-16 px-4">
         {/* Header */}
-        <div className="mb-16 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-foreground">
+        <div className="mb-10 sm:mb-16 text-center">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-foreground">
             PairCode
           </h1>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
             A lightweight, real-time collaborative code editor designed specifically for technical interviews.
             No setup required — just share a link and start coding.
           </p>
@@ -39,8 +39,8 @@ export default function HomePage() {
         <RoomDashboard onCreateRoom={handleCreateRoom} onJoinRoom={handleJoinRoom} />
 
         {/* Features grid */}
-        <div className="max-w-4xl mx-auto mt-20">
-          <div className="grid md:grid-cols-3 gap-6 mb-16">
+        <div className="max-w-4xl mx-auto mt-12 sm:mt-20">
+          <div className="grid md:grid-cols-3 gap-4 sm:gap-6 mb-10 sm:mb-16">
             <div className="group bg-card rounded-xl p-6 border border-border hover:shadow-xl transition-all duration-300 hover:border-accent">
               <div className="w-10 h-10 bg-accent/15 rounded-md flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
                 <Plus className="w-5 h-5 text-accent" />

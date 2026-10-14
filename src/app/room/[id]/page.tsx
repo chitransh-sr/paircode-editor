@@ -11,7 +11,7 @@ import { RunButton } from "@/components/editor/run-button";
 import { ConsolePanel } from "@/components/output/console-panel";
 import { PreviewPanel } from "@/components/output/preview-panel";
 import { PresenceBar } from "@/components/editor/presence-bar";
-import { useRoom, isRoomOwner } from "@/hooks/use-room";
+import { useRoom, isRoomOwner, sanitizeStoredName } from "@/hooks/use-room";
 import { useLocalStorage } from "@/hooks/use-mobile";
 import { useExecution } from "@/hooks/use-execution";
 import { getLanguage, FORMATTABLE_LANGUAGES } from "@/lib/execute/languages";
@@ -313,9 +313,18 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  // Read identity from storage after mount (keeps first render SSR-identical)
+  // Read identity from storage after mount (keeps first render SSR-identical).
+  // Legacy auto-generated names (UserNNN) are purged so the join modal
+  // asks for the real name instead of reusing a placeholder.
   useEffect(() => {
-    if (!localStorage.getItem("editor-user-name")) {
+    const storedName = sanitizeStoredName(localStorage.getItem("editor-user-name"));
+    if (!storedName) {
+      try {
+        localStorage.removeItem("editor-user-name");
+      } catch {
+        // storage unavailable — modal still prompts
+      }
+      setUserName("");
       setShowJoinModal(true);
     }
     const storedColor = localStorage.getItem("editor-user-color");
@@ -390,7 +399,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
         defaultName={userName || ""}
       />
 
-      <div className="h-screen flex flex-col bg-background">
+      <div className="h-screen supports-[height:100dvh]:h-dvh flex flex-col bg-background">
         {/* Header */}
         <RoomHeader
           room={room}
