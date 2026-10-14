@@ -21,6 +21,8 @@ export interface LanguageMeta {
   preview?: "html" | "css" | "script" | "react" | "web";
   /** Multi-file definitions (e.g. Web mode: index.html + styles.css). */
   files?: RoomFile[];
+  /** Hidden from language pickers (legacy modes kept working for old rooms). */
+  hidden?: boolean;
 }
 
 /** A single editable file inside a (possibly multi-file) language mode. */

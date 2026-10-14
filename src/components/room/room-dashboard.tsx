@@ -416,7 +416,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                       onChange={(e) => setSelectedLanguage(e.target.value)}
                       className="w-full appearance-none bg-background border border-border rounded-lg pl-3.5 pr-10 py-2.5 text-base sm:text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition cursor-pointer"
                     >
-                      {LANGUAGES.map((lang) => (
+                      {LANGUAGES.filter((lang) => !lang.hidden).map((lang) => (
                         <option key={lang.id} value={lang.name}>
                           {lang.label}
                         </option>

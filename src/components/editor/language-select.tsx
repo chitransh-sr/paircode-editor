@@ -39,7 +39,7 @@ export function LanguageSelect({ value, onChange, disabled }: LanguageSelectProp
             onClick={() => setOpen(false)}
           />
           <div className="absolute top-full left-0 mt-1 w-48 bg-popover border border-border rounded-md shadow-lg z-20 max-h-80 overflow-y-auto">
-            {LANGUAGES.map((lang) => (
+            {LANGUAGES.filter((lang) => !lang.hidden).map((lang) => (
               <button
                 key={lang.id}
                 onClick={() => {
