@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Link2, Briefcase, GraduationCap, Loader2, Lock, ChevronDown } from "lucide-react";
 import type { Room } from "@/types/room";
-import { createRoom, verifyRoomPassword, isRoomOwner } from "@/hooks/use-room";
+import { createRoom, verifyRoomPassword } from "@/hooks/use-room";
 import { LANGUAGES, getLanguage } from "@/lib/execute/languages";
 import { cn } from "@/lib/utils/cn";
 
@@ -126,16 +126,13 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
         password: isPrivateRoom ? createdPassword : undefined,
       });
 
-      // Creator just set the password, so mark this session as verified.
-      // Otherwise the interviewer lands on /room/:id and hits the
-      // password gate for their own room.
-      if (isPrivateRoom && typeof window !== "undefined") {
-        try {
-          sessionStorage.setItem(`room-verified-${room.id}`, "true");
-        } catch {
-          // sessionStorage unavailable — room page will show the gate
-        }
-      }
+      // NOTE: we intentionally do NOT set room-verified-<id> here.
+      // sessionStorage is shared across tabs — if we did, a candidate
+      // opening a second tab in the same browser would inherit the
+      // verified flag and bypass the password prompt.
+      // The owner still bypasses the room-page PasswordGate via the
+      // isRoomOwner() check in checkRoomAccess (owner token is in
+      // sessionStorage and read-only).
 
       // Store in localStorage (with the display name), then update state.
       const entry: RecentRoom = { ...room, name: roomName.trim() };
@@ -148,19 +145,18 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       setRoomPassword("");
       setShowCreateModal(false);
 
-      // If private, show the password to the interviewer for sharing
-      // (kept for state completeness; navigation to /room/:id happens
-      // immediately below, so the interviewer sees the editor directly —
-      // the verified flag above is what bypasses the gate).
+      // If private, show the password modal FIRST so the interviewer can
+      // copy/share it — navigation happens via the modal's "Enter Room"
+      // button. For public rooms there is nothing to share, so navigate
+      // immediately.
       if (isPrivateRoom) {
         setCreatedRoom(room);
         setCreatedRoomPassword(createdPassword);
       } else {
         setCreatedRoomPassword(null);
         setCreatedRoom(null);
+        onCreateRoom(room);
       }
-
-      onCreateRoom(room);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create room");
     } finally {
@@ -181,22 +177,23 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
   const handleRecentJoin = async (entry: RecentRoom) => {
     // History Join must enforce the same password step as the join modal —
     // a plain link would skip verification for protected rooms.
-    // The owner (this browser created the room) always joins directly.
-    if (isRoomOwner(entry.id)) {
+    //
+    // We check room-verified (not isRoomOwner) because sessionStorage is
+    // shared across tabs — isRoomOwner would let a candidate on the same
+    // browser as the owner bypass the gate. room-verified is only set after
+    // explicit password entry, so a same-browser candidate still gets
+    // prompted.
+    const alreadyVerified =
+      typeof window !== "undefined" &&
+      sessionStorage.getItem(`room-verified-${entry.id}`) === "true";
+
+    if (alreadyVerified) {
       onJoinRoom(entry.id);
       return;
     }
-    // The stored entry is authoritative for privacy: is_private never
-    // changes after creation. Anything else (legacy entries) is confirmed
-    // against the server, which is the source of truth.
-    if (entry.is_private === true) {
-      promptHistoryPassword(entry.id);
-      return;
-    }
-    if (entry.is_private === false) {
-      onJoinRoom(entry.id);
-      return;
-    }
+    // Server is the source of truth for privacy (localStorage entries can
+    // be stale). If the server says private → prompt. Only join directly
+    // when the server confirms public.
     try {
       const response = await fetch(`/api/rooms/${entry.id}`, {
         headers: { Accept: "application/json" },
@@ -207,10 +204,20 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
           promptHistoryPassword(entry.id);
           return;
         }
+        // Server confirms public → join directly.
+        onJoinRoom(entry.id);
+        return;
       }
     } catch {
-      // Server unreachable — fall through to direct join; the room page
-      // gate is the backstop when online.
+      // Server unreachable — fall through to the stored flag below; the
+      // room-page gate is the backstop when online.
+    }
+    // Server check failed or was inconclusive: fall back to the stored
+    // entry (is_private is immutable after creation, so a stored `true`
+    // is authoritative).
+    if (entry.is_private === true) {
+      promptHistoryPassword(entry.id);
+      return;
     }
     onJoinRoom(entry.id);
   };
@@ -679,16 +686,21 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     setCreatedRoomPassword(null);
                     setCreatedRoom(null);
                   }}
-                  className="w-full px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  className="w-full px-4 py-2 bg-muted text-foreground hover:bg-muted/80 rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
-                  Copy Room Link & Close
+                  Copy Room Link
                 </button>
 
                 <button
-                  onClick={() => { setCreatedRoomPassword(null); setCreatedRoom(null); }}
-                  className="w-full px-4 py-2 bg-muted text-foreground hover:bg-muted/80 rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  onClick={() => {
+                    const target = createdRoom;
+                    setCreatedRoomPassword(null);
+                    setCreatedRoom(null);
+                    onCreateRoom(target);
+                  }}
+                  className="w-full px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
-                  Close
+                  Enter Room
                 </button>
               </div>
 
