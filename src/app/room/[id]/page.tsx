@@ -184,6 +184,14 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
   const previewSupported = !!room && !!getLanguage(room.language)?.preview;
 
+  // Signature of the code+language the visible preview was built from.
+  // Guards against no-op rebuilds: background room polls mint a fresh room
+  // object every few seconds, which recreates rebuildPreview below — without
+  // this guard each poll would rebuild (fresh CSP nonce → new iframe key →
+  // full remount) and the preview would visibly blink while idle.
+  const previewSigRef = useRef<string | null>(null);
+  const previewSig = (c: string, l: string) => `${l.length}:${l}\n${c}`;
+
   const rebuildPreview = useCallback(async () => {
     if (!room) return;
     const strategy = getLanguage(room.language)?.preview;
@@ -197,28 +205,36 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       setPreviewHtml(await buildPreviewHtml(strategy, source));
     } catch {
       setPreviewHtml(previewError("Could not build preview."));
+    } finally {
+      previewSigRef.current = previewSig(code, room.language);
     }
   }, [room, code]);
 
-  // Live preview: rebuild debounced while typing with the preview open
+  // Live preview: rebuild debounced while typing with the preview open.
+  // Skips entirely when code+language already match the built preview, so
+  // background polls never blink the iframe.
   useEffect(() => {
     if (!previewOpen || !previewSupported) return;
+    if (previewSigRef.current === previewSig(code, room?.language ?? "")) return;
     const timer = setTimeout(() => {
       rebuildPreview();
     }, 700);
     return () => clearTimeout(timer);
-  }, [previewOpen, previewSupported, rebuildPreview]);
+  }, [previewOpen, previewSupported, rebuildPreview, room?.language, code]);
 
   const handleTogglePreview = useCallback(() => {
     // Build immediately when opening so the pane never sits blank white.
-    // (The debounced effect above handles subsequent typing.)
+    // (The debounced effect above handles subsequent typing.) Skips the
+    // rebuild when the stored preview already matches — no blink.
     if (!previewOpen) {
       setPreviewOpen(true);
-      rebuildPreview();
+      if (previewSigRef.current !== previewSig(code, room?.language ?? "")) {
+        rebuildPreview();
+      }
     } else {
       setPreviewOpen(false);
     }
-  }, [previewOpen, rebuildPreview]);
+  }, [previewOpen, rebuildPreview, code, room?.language]);
 
   const handleRun = useCallback(async () => {
     if (!room || !code) return;
