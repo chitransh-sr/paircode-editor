@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useCallback } from "react";
-import { Share2, Check, User, LogOut, Settings, Eye, EyeOff, Copy, Lock } from "lucide-react";
+import { Share2, Check, CodeXml, LogOut, Settings, Eye, EyeOff, Copy, Lock } from "lucide-react";
 import type { Room } from "@/types/room";
 import { useMobile } from "@/hooks/use-mobile";
-import { getUserColor } from "@/lib/presence/colors";
+import { getUserColor, getUserInitials } from "@/lib/presence/colors";
 import { getRoomPassword } from "@/hooks/use-room";
 import { SettingsDrawer } from "@/components/room/settings-drawer";
 import { LanguageSelect } from "@/components/editor/language-select";
@@ -116,11 +116,14 @@ export function RoomHeader({
   }, [room.id]);
 
   return (
-    <div className="flex items-center justify-between p-3 bg-card border-b border-border transition-colors">
+    <div className="flex items-center justify-between px-4 py-2.5 bg-card border-b border-border transition-colors">
       {/* Left: Logo & Room Info */}
       <div className="flex items-center gap-3 min-w-0">
-        <span className="text-xl font-bold text-accent truncate hidden sm:inline">PairCode</span>
-        <span className="text-xl font-bold text-accent sm:hidden">PC</span>
+        <span className="flex items-center gap-1.5 shrink-0">
+          <CodeXml className="w-5 h-5 text-accent" />
+          <span className="text-lg font-bold text-accent truncate hidden sm:inline tracking-tight">PairCode</span>
+          <span className="text-lg font-bold text-accent sm:hidden">PC</span>
+        </span>
         <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
           <span className="hidden sm:inline">Room:</span>
           <button
@@ -132,7 +135,7 @@ export function RoomHeader({
           </button>
           <button
             onClick={copyRoomId}
-            className="p-1.5 hover:bg-muted/80 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="p-2 hover:bg-muted rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             title="Copy room link"
             aria-label="Copy room link"
           >
@@ -162,7 +165,7 @@ export function RoomHeader({
               </code>
               <button
                 onClick={() => setShowPassword(!showPassword)}
-                className="p-1.5 hover:bg-muted/80 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="p-2 hover:bg-muted rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 title={showPassword ? "Hide room password" : "View room password"}
                 aria-label={showPassword ? "Hide room password" : "View room password"}
               >
@@ -175,7 +178,7 @@ export function RoomHeader({
               {storedPassword && (
                 <button
                   onClick={copyPassword}
-                  className="p-1.5 hover:bg-muted/80 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  className="p-2 hover:bg-muted rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   title="Copy password"
                   aria-label="Copy password"
                 >
@@ -190,6 +193,8 @@ export function RoomHeader({
           )}
         </div>
       </div>
+
+      <div className="w-px h-6 bg-border hidden lg:block shrink-0" />
 
       {/* Center: Controls */}
       <div className="flex items-center gap-2 min-w-0">
@@ -208,7 +213,7 @@ export function RoomHeader({
         <ModeToggle />
         <button
           onClick={copyLink}
-          className="p-1.5 hover:bg-muted/80 rounded-md transition-colors text-sm flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="p-2 hover:bg-muted rounded-lg transition-colors text-sm flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           title="Share room link"
         >
           {copied ? (
@@ -221,7 +226,7 @@ export function RoomHeader({
         {canManage && (
           <button
             onClick={() => setShowSettings(true)}
-            className="p-1.5 hover:bg-muted/80 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="p-2 hover:bg-muted rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             title="Settings"
             aria-label="Open settings"
           >
@@ -230,20 +235,24 @@ export function RoomHeader({
         )}
       </div>
 
+      <div className="w-px h-6 bg-border hidden lg:block shrink-0" />
+
       {/* Right: User & Actions */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2">
-          <User
-            className="w-4 h-4"
-            style={{ color: userColor || getUserColor(0) }}
-          />
-          <span className="hidden sm:inline text-sm text-foreground/80" title={userName}>
+        <div className="flex items-center gap-2" title={userName || "Guest"}>
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-accent-foreground shrink-0"
+            style={{ backgroundColor: userColor || getUserColor(0) }}
+          >
+            {getUserInitials(userName || "Guest")}
+          </div>
+          <span className="hidden sm:inline text-sm text-foreground/80 max-w-28 truncate">
             {userName || "Guest"}
           </span>
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 hover:bg-muted/80 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="p-2 hover:bg-muted rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           title="Leave room"
         >
           <LogOut className="w-4 h-4 text-muted-foreground" />

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, use, useRef, useId } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, AlertCircle, RefreshCw, Trash2, Check, Wand2, Eye, RotateCcw } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Trash2, Check, Wand2, Eye, RotateCcw, Globe } from "lucide-react";
 import { RoomHeader } from "@/components/room/room-header";
 import { JoinModal } from "@/components/room/join-modal";
 import { PasswordGate, checkRoomAccess } from "@/components/room/password-gate";
@@ -385,7 +385,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
         />
 
         {/* Presence bar */}
-        <div className="px-3 py-1">
+        <div className="px-3 py-1.5">
           <PresenceBar users={activeUsers} currentUser={currentUser} />
         </div>
 
@@ -406,15 +406,16 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                     disabled={editorReadOnly}
                   />
                 </div>
+                <div className="w-px h-5 bg-border shrink-0 hidden sm:block" />
                 <button
                   onClick={handleSaveSnapshot}
                   disabled={!code || editorReadOnly}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-                    "flex items-center gap-2",
+                    "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                    "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                     !code || editorReadOnly
-                      ? "bg-muted cursor-not-allowed text-muted-foreground"
-                      : "bg-muted hover:bg-muted/80 text-foreground"
+                      ? "opacity-50 cursor-not-allowed text-muted-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                   title="Save snapshot (Ctrl/Cmd + S)"
                 >
@@ -427,7 +428,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 </button>
                 <button
                   onClick={handleClearConsole}
-                  className="shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 bg-muted hover:bg-muted/80 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  className="shrink-0 p-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   title="Clear console"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -436,11 +437,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                   onClick={handleFormat}
                   disabled={!code || !canFormat || formatting || editorReadOnly}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-                    "flex items-center gap-2",
+                    "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                    "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                     !code || !canFormat || formatting || editorReadOnly
-                      ? "bg-muted cursor-not-allowed text-muted-foreground"
-                      : "bg-muted hover:bg-muted/80 text-foreground"
+                      ? "opacity-50 cursor-not-allowed text-muted-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                   title={
                     canFormat
@@ -459,17 +460,18 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                   onClick={handleReset}
                   disabled={!code || editorReadOnly}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                    "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
                     "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                     !code || editorReadOnly
-                      ? "bg-muted cursor-not-allowed text-muted-foreground"
-                      : "bg-muted hover:bg-muted/80 text-foreground"
+                      ? "opacity-50 cursor-not-allowed text-muted-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                   title="Reset to default code"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span className="hidden sm:inline">Reset</span>
                 </button>
+                <div className="w-px h-5 bg-border shrink-0 hidden sm:block" />
                 <button
                   onClick={handleTogglePreview}
                   disabled={!previewSupported}
@@ -493,27 +495,25 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                   <span className="hidden sm:inline">Preview</span>
                 </button>
                 {formatMsg && (
-                  <span className="shrink-0 text-xs text-destructive max-w-32 sm:max-w-64 truncate" title={formatMsg}>
+                  <span className="shrink-0 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-full px-2.5 py-0.5 max-w-32 sm:max-w-64 truncate" title={formatMsg}>
                     {formatMsg}
                   </span>
                 )}
                 {roomUpdateError && (
-                  <span className="shrink-0 text-xs text-orange-400 max-w-32 sm:max-w-64 truncate" title={roomUpdateError}>
+                  <span className="shrink-0 text-xs text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-full px-2.5 py-0.5 max-w-32 sm:max-w-64 truncate" title={roomUpdateError}>
                     {roomUpdateError}
                   </span>
                 )}
               </div>
 
               {/* Language info */}
-              <div className="hidden md:flex text-xs text-muted-foreground/70 items-center gap-2 shrink-0">
+              <div className="hidden md:flex text-xs text-muted-foreground items-center gap-2 shrink-0 rounded-full border border-border bg-muted/40 px-2.5 py-1">
+                <Globe className="w-3 h-3 text-muted-foreground" />
                 {getLanguage(room.language)?.label || room.language}
                 {room.is_read_only && (
-                  <>
-                    <span>•</span>
-                    <span className="text-orange-400">
-                      {isOwner ? "Candidates read-only" : "Read-only"}
-                    </span>
-                  </>
+                  <span className="text-amber-500 bg-amber-500/15 rounded-full px-2 py-px font-medium">
+                    {isOwner ? "Candidates read-only" : "Read-only"}
+                  </span>
                 )}
               </div>
             </div>
