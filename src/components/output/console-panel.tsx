@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from "react";
-import { Terminal, Send, Trash2, Info } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Terminal, Send, Trash2, Info, ChevronDown, ChevronUp } from "lucide-react";
 import type { ExecutionResult } from "@/types/execution";
+import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils/cn";
 
 interface ConsolePanelProps {
@@ -15,6 +16,19 @@ interface ConsolePanelProps {
 export function ConsolePanel({ result, onStdinSubmit, waitingForInput, onClear }: ConsolePanelProps) {
   const [input, setInput] = useState("");
   const [cleared, setCleared] = useState(false);
+
+  // Accordion: collapsed by default on mobile (saves screen space),
+  // open on desktop. The user's explicit choice sticks across resizes.
+  const isMobile = useMobile();
+  const [collapsed, setCollapsed] = useState(false);
+  const touchedRef = useRef(false);
+  useEffect(() => {
+    if (!touchedRef.current) setCollapsed(isMobile);
+  }, [isMobile]);
+  const toggleCollapsed = () => {
+    touchedRef.current = true;
+    setCollapsed((c) => !c);
+  };
 
   // When result changes, reset cleared state
   useEffect(() => {
@@ -75,9 +89,22 @@ export function ConsolePanel({ result, onStdinSubmit, waitingForInput, onClear }
   };
 
   return (
-    <div className="bg-card border-t border-border h-48 flex flex-col shrink-0">
-      {/* Console header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
+    <div className={cn("bg-card border-t border-border flex flex-col shrink-0", collapsed ? "h-auto" : "h-48")}>
+      {/* Console header (accordion toggle — whole row is tappable) */}
+      <div
+        onClick={toggleCollapsed}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggleCollapsed();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={!collapsed}
+        title={collapsed ? "Expand console" : "Collapse console"}
+        className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0 cursor-pointer select-none"
+      >
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-6 h-6 rounded-md bg-accent/15 flex items-center justify-center shrink-0">
             <Terminal className="w-3.5 h-3.5 text-accent" />
@@ -106,19 +133,29 @@ export function ConsolePanel({ result, onStdinSubmit, waitingForInput, onClear }
             </span>
           )}
         </div>
-        <button
-          onClick={handleClear}
-          className="p-2 hover:bg-muted rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          title="Clear console"
-          aria-label="Clear console"
-        >
-          <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClear();
+            }}
+            className="p-2 hover:bg-muted rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            title="Clear console"
+            aria-label="Clear console"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+          </button>
+          {collapsed ? (
+            <ChevronUp className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+          )}
+        </div>
       </div>
 
       {/* Console output */}
       <div
-        className="flex-1 overflow-y-auto text-[13px] leading-relaxed p-3 text-foreground/80"
+        className={cn("flex-1 overflow-y-auto text-[13px] leading-relaxed p-3 text-foreground/80", collapsed && "hidden")}
         style={{
           backgroundColor: "var(--color-background)",
           fontFamily: "var(--font-mono, 'JetBrains Mono', ui-monospace, 'Fira Code', monospace)",
@@ -135,7 +172,7 @@ export function ConsolePanel({ result, onStdinSubmit, waitingForInput, onClear }
       </div>
 
       {/* STDIN input when waiting */}
-      {waitingForInput && (
+      {waitingForInput && !collapsed && (
         <div className="border-t border-border px-3 py-2 bg-background shrink-0">
           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1.5">
             <Info className="w-3 h-3" />
