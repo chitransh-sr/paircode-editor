@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { Plus, Link2, Briefcase, GraduationCap, Loader2, Lock, ChevronDown } from "lucide-react";
 import type { Room } from "@/types/room";
 import { createRoom, verifyRoomPassword } from "@/hooks/use-room";
@@ -169,6 +168,45 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
     }
   };
 
+  const handleRecentJoin = async (entry: RecentRoom) => {
+    // History Join must enforce the same password step as the join modal —
+    // a plain link would skip verification for protected rooms.
+    if (entry.is_private === false) {
+      onJoinRoom(entry.id);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/rooms/${entry.id}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (response.ok) {
+        const serverRoom: Room = await response.json();
+        if (serverRoom.is_private) {
+          let verified = false;
+          try {
+            verified =
+              sessionStorage.getItem(`room-verified-${entry.id}`) === "true";
+          } catch {
+            verified = false;
+          }
+          if (!verified) {
+            setJoinInput(entry.id);
+            setJoinName(readStoredName());
+            setJoinPassword("");
+            setJoinError("");
+            setShowJoinModal(false);
+            setRequiresPassword(true);
+            return;
+          }
+        }
+      }
+    } catch {
+      // Server unreachable — fall through to direct join; the room page
+      // gate is the backstop when online.
+    }
+    onJoinRoom(entry.id);
+  };
+
   const handleJoinRoom = async () => {
     const roomId = parseRoomId(joinInput);
     if (!roomId) {
@@ -302,12 +340,12 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     )}
                     <span className="text-sm text-muted-foreground shrink-0">{getLanguage(room.language)?.label || room.language}</span>
                   </div>
-                  <Link
-                    href={`/room/${room.id}`}
-                    className="text-sm text-accent hover:text-accent/90 transition-opacity focus-visible:opacity-100 shrink-0 ml-3"
+                  <button
+                    onClick={() => handleRecentJoin(room)}
+                    className="text-sm text-accent hover:text-accent/90 transition-opacity focus-visible:opacity-100 shrink-0 ml-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
                   >
                     Join
-                  </Link>
+                  </button>
                 </div>
               ))}
             </div>

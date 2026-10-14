@@ -62,7 +62,15 @@ export async function POST(request: Request) {
     }
 
     return withSecurityHeaders(
-      Response.json(createRoomRecord({ language, theme, password, is_private }), { status: 201 }),
+      Response.json(
+        (() => {
+          const { room, owner_token } = createRoomRecord({ language, theme, password, is_private });
+          // owner_token is returned once at creation; the creator stores it
+          // and sends it back as `x-room-owner-token` on PATCH.
+          return { ...room, owner_token };
+        })(),
+        { status: 201 }
+      ),
       {
         "X-RateLimit-Limit": "20",
         "X-RateLimit-Remaining": String(rateCheck.remaining),

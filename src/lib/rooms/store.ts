@@ -16,9 +16,11 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   return testHash === hash;
 }
 
-/** Strip password_hash before returning to client. */
+/** Strip server-only secrets before returning to client. */
 export function stripPassword(room: Room): Room {
-  const { password_hash, ...safe } = room;
+  const { password_hash, owner_token, ...safe } = room;
+  void password_hash;
+  void owner_token;
   return safe;
 }
 
@@ -42,18 +44,20 @@ export function defaultRoom(id: string): Room {
   };
 }
 
-export function createRoomRecord(input: CreateRoomInput): Room {
+export function createRoomRecord(input: CreateRoomInput): { room: Room; owner_token: string } {
+  const owner_token = randomUUID();
   const room: Room = {
     ...defaultRoom(randomUUID()),
     language: input.language || "javascript",
     theme: input.theme || "vs-dark",
     is_private: input.is_private || false,
+    owner_token,
   };
   if (room.is_private && input.password) {
     room.password_hash = hashPassword(input.password);
   }
   rooms.set(room.id, room);
-  return stripPassword(room);
+  return { room: stripPassword(room), owner_token };
 }
 
 /** Get a room record (without password_hash). */
@@ -72,12 +76,23 @@ export function getRoomRecordSecure(id: string): Room | undefined {
 }
 
 export function updateRoomRecord(id: string, updates: UpdateRoomInput): Room {
-  const room: Room = { ...getRoomRecord(id) };
+  // Base on the secure record so server-only secrets (password_hash,
+  // owner_token) survive settings changes.
+  const existing = rooms.get(id);
+  const room: Room = { ...(existing ?? defaultRoom(id)) };
   if (updates.language !== undefined) room.language = updates.language;
   if (updates.theme !== undefined) room.theme = updates.theme;
   if (updates.is_read_only !== undefined) room.is_read_only = updates.is_read_only;
-  rooms.set(id, room);
+  rooms.set(room.id, room);
   return stripPassword(room);
+}
+
+/** Verify an owner token for a room. Rooms without an owner token
+ * (legacy / auto-materialized open rooms) allow updates for compatibility. */
+export function verifyOwnerToken(id: string, token: string | null): boolean {
+  const existing = rooms.get(id);
+  if (!existing || !existing.owner_token) return true;
+  return !!token && token === existing.owner_token;
 }
 
 export function deleteRoomRecord(id: string): void {

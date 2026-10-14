@@ -13,6 +13,8 @@ interface SettingsDrawerProps {
   language: string;
   theme: string;
   isReadOnly: boolean;
+  /** Whether this browser owns the room. Candidates get a locked view. */
+  canManage?: boolean;
   onLanguageChange: (lang: string) => void;
   onThemeChange: (theme: string) => void;
   onReadOnlyChange: (readOnly: boolean) => void;
@@ -24,6 +26,7 @@ export function SettingsDrawer({
   language,
   theme,
   isReadOnly,
+  canManage = false,
   onLanguageChange,
   onThemeChange,
   onReadOnlyChange,
@@ -64,12 +67,19 @@ export function SettingsDrawer({
         </div>
 
         <div className="p-4 space-y-4">
+          {!canManage && (
+            <div className="rounded-lg border border-accent/20 bg-accent/5 p-3">
+              <p className="text-xs text-muted-foreground text-center">
+                Only the interviewer can change room settings.
+              </p>
+            </div>
+          )}
           <div>
             <label className="text-sm text-muted-foreground mb-2 block">Language</label>
             <LanguageSelect
               value={language}
               onChange={onLanguageChange}
-              disabled={isReadOnly}
+              disabled={!canManage || isReadOnly}
             />
           </div>
 
@@ -78,7 +88,7 @@ export function SettingsDrawer({
             <ThemeToggle
               theme={theme}
               onChange={onThemeChange}
-              disabled={isReadOnly}
+              disabled={!canManage || isReadOnly}
             />
           </div>
 
@@ -93,12 +103,13 @@ export function SettingsDrawer({
           </div>
 
           <div>
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className={`flex items-center gap-2 ${canManage ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}>
               <input
                 type="checkbox"
                 checked={isReadOnly}
+                disabled={!canManage}
                 onChange={(e) => onReadOnlyChange(e.target.checked)}
-                className="w-4 h-4 rounded bg-background text-accent focus:ring-accent border-border"
+                className="w-4 h-4 rounded bg-background text-accent focus:ring-accent border-border disabled:cursor-not-allowed"
               />
               <span className="text-sm text-foreground">Read-only mode (candidates can view only)</span>
             </label>

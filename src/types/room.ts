@@ -10,6 +10,8 @@ export interface Room {
   is_private: boolean;
   /** Hashed password — never sent to the client. */
   password_hash?: string;
+  /** Owner token — server-only, never sent to the client except once at creation. */
+  owner_token?: string;
 }
 
 export interface CreateRoomInput {

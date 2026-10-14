@@ -17,6 +17,7 @@ export function useRoom(roomId?: string) {
   const [room, setRoom] = useState<Room | null>(null);
   const [isLoading, setIsLoading] = useState(!!roomId);
   const [error, setError] = useState<Error | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const fetchRoom = useCallback(async () => {
     if (!roomId) {
@@ -51,13 +52,24 @@ export function useRoom(roomId?: string) {
   const updateRoom = useCallback(
     async (updates: UpdateRoomInput) => {
       if (!roomId) return;
+      setUpdateError(null);
 
       try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        const ownerToken = getRoomOwnerToken(roomId);
+        if (ownerToken) headers["x-room-owner-token"] = ownerToken;
         const response = await fetch(`/api/rooms/${roomId}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify(updates),
         });
+
+        if (response.status === 403) {
+          // Candidate (or anyone without the owner token) tried to change
+          // settings — do NOT apply locally, surface the denial instead.
+          setUpdateError("Only the interviewer can change room settings");
+          return room ?? DEFAULT_ROOM(roomId);
+        }
 
         if (response.ok) {
           const data = await response.json();
@@ -79,7 +91,42 @@ export function useRoom(roomId?: string) {
     fetchRoom();
   }, [fetchRoom]);
 
-  return { room, isLoading, error, refetch: fetchRoom, updateRoom };
+  return { room, isLoading, error, updateError, refetch: fetchRoom, updateRoom };
+}
+
+/** sessionStorage key holding this browser's owner token for a room. */
+function ownerKey(roomId: string): string {
+  return `room-owner-${roomId}`;
+}
+
+/** sessionStorage key holding the room password for the creating browser. */
+function passwordKey(roomId: string): string {
+  return `room-password-${roomId}`;
+}
+
+/** Read this browser's stored room password (creator only, session-only). */
+export function getRoomPassword(roomId: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return sessionStorage.getItem(passwordKey(roomId));
+  } catch {
+    return null;
+  }
+}
+
+/** Read this browser's owner token for a room (SSR-safe). */
+export function getRoomOwnerToken(roomId: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return sessionStorage.getItem(ownerKey(roomId));
+  } catch {
+    return null;
+  }
+}
+
+/** Whether this browser created (owns) the room. */
+export function isRoomOwner(roomId: string): boolean {
+  return !!getRoomOwnerToken(roomId);
 }
 
 export async function verifyRoomPassword(
@@ -114,6 +161,15 @@ export async function createRoom(input?: CreateRoomInput): Promise<Room> {
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    // Local-only room: this browser is the owner.
+    try {
+      sessionStorage.setItem(ownerKey(id), "local-owner");
+      if (input?.password) {
+        sessionStorage.setItem(passwordKey(id), input.password);
+      }
+    } catch {
+      // sessionStorage unavailable — ownership checks fall back gracefully
+    }
     return {
       id,
       language: input?.language || "javascript",
@@ -126,5 +182,25 @@ export async function createRoom(input?: CreateRoomInput): Promise<Room> {
     };
   }
 
-  return response.json();
+  const data = await response.json();
+  // The server returns owner_token once at creation — persist it as this
+  // browser's proof of ownership, then strip it from the room object.
+  const { owner_token, ...room } = data as Room & { owner_token?: string };
+  if (owner_token) {
+    try {
+      sessionStorage.setItem(ownerKey(room.id), owner_token);
+    } catch {
+      // sessionStorage unavailable — ownership checks fall back gracefully
+    }
+  }
+  // Keep the room password in this session so the interviewer can view it
+  // later via the header eye icon. Session-only: cleared on browser close.
+  if (input?.password) {
+    try {
+      sessionStorage.setItem(passwordKey(room.id), input.password);
+    } catch {
+      // sessionStorage unavailable — password viewer falls back gracefully
+    }
+  }
+  return room as Room;
 }

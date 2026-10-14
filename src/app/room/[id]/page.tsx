@@ -11,7 +11,7 @@ import { RunButton } from "@/components/editor/run-button";
 import { ConsolePanel } from "@/components/output/console-panel";
 import { PreviewPanel } from "@/components/output/preview-panel";
 import { PresenceBar } from "@/components/editor/presence-bar";
-import { useRoom } from "@/hooks/use-room";
+import { useRoom, isRoomOwner } from "@/hooks/use-room";
 import { useLocalStorage } from "@/hooks/use-mobile";
 import { useExecution } from "@/hooks/use-execution";
 import { getLanguage, FORMATTABLE_LANGUAGES } from "@/lib/execute/languages";
@@ -32,6 +32,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     room: fetchedRoom,
     isLoading,
     error: roomError,
+    updateError: roomUpdateError,
     updateRoom: fetchRoomUpdate,
   } = useRoom(roomId);
 
@@ -49,6 +50,9 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const editorRef = useRef<CodeEditorHandle | null>(null);
   const lastLangRef = useRef<string | null>(null);
   const [forceRender, setForceRender] = useState(0);
+  // Ownership is resolved client-side after mount (sessionStorage is
+  // unavailable during SSR, so start false to match the SSR output).
+  const [isOwner, setIsOwner] = useState(false);
 
   // Use execution hook at the page level so the result reaches the console
   const { execute, isExecuting, result: executionResult, clearResult } = useExecution();
@@ -67,10 +71,30 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     }
   }, [roomId]);
 
+  // Resolve ownership client-side once the room is known. Starts false so
+  // the first client render matches SSR; refreshed after unlock events.
+  useEffect(() => {
+    if (fetchedRoom?.id) {
+      setIsOwner(isRoomOwner(fetchedRoom.id));
+    }
+  }, [fetchedRoom?.id, forceRender]);
+
+  useEffect(() => {
+    const onUnlock = () => {
+      if (fetchedRoom?.id) setIsOwner(isRoomOwner(fetchedRoom.id));
+    };
+    window.addEventListener("room-unlocked", onUnlock);
+    return () => window.removeEventListener("room-unlocked", onUnlock);
+  }, [fetchedRoom?.id]);
+
   // Derived error: combine hook error and roomId validation
   const error = roomError?.message || (!roomId && !roomError && !isLoading ? "Room ID not provided" : null);
 
   const room = fetchedRoom;
+
+  // Read-only applies to candidates only — the interviewer (owner) always
+  // keeps full edit access so they can demonstrate and assist.
+  const editorReadOnly = !!room?.is_read_only && !isOwner;
 
   // Seed the runnable code with the language default on first load and on
   // language switch (unless the user already typed custom code).
@@ -101,6 +125,9 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
   const handleRoomUpdate = useCallback(
     (updatedRoom: Room) => {
+      // Only the interviewer (owner) may change room settings — candidates
+      // get a disabled UI, and the API rejects direct PATCH calls with 403.
+      if (!isOwner) return;
       // Persist to database (updates fetchedRoom via useRoom hook)
       fetchRoomUpdate({
         language: updatedRoom.language,
@@ -108,7 +135,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
         is_read_only: updatedRoom.is_read_only,
       }).catch(console.error);
     },
-    [fetchRoomUpdate]
+    [fetchRoomUpdate, isOwner]
   );
 
   const handleCodeChange = useCallback((newCode: string) => {
@@ -325,6 +352,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
         <RoomHeader
           room={room}
           userName={userName}
+          canManage={isOwner}
           onClose={() => router.push("/")}
           onRoomUpdate={handleRoomUpdate}
         />
@@ -348,16 +376,16 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                     isExecuting={isExecuting}
                     result={executionResult}
                     onExecute={handleRun}
-                    disabled={room.is_read_only}
+                    disabled={editorReadOnly}
                   />
                 </div>
                 <button
                   onClick={handleSaveSnapshot}
-                  disabled={!code || room.is_read_only}
+                  disabled={!code || editorReadOnly}
                   className={cn(
                     "shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
                     "flex items-center gap-2",
-                    !code || room.is_read_only
+                    !code || editorReadOnly
                       ? "bg-muted cursor-not-allowed text-muted-foreground"
                       : "bg-muted hover:bg-muted/80 text-foreground"
                   )}
@@ -379,11 +407,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 </button>
                 <button
                   onClick={handleFormat}
-                  disabled={!code || !canFormat || formatting || room.is_read_only}
+                  disabled={!code || !canFormat || formatting || editorReadOnly}
                   className={cn(
                     "shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
                     "flex items-center gap-2",
-                    !code || !canFormat || formatting || room.is_read_only
+                    !code || !canFormat || formatting || editorReadOnly
                       ? "bg-muted cursor-not-allowed text-muted-foreground"
                       : "bg-muted hover:bg-muted/80 text-foreground"
                   )}
@@ -427,6 +455,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                     {formatMsg}
                   </span>
                 )}
+                {roomUpdateError && (
+                  <span className="shrink-0 text-xs text-orange-400 max-w-32 sm:max-w-64 truncate" title={roomUpdateError}>
+                    {roomUpdateError}
+                  </span>
+                )}
               </div>
 
               {/* Language info */}
@@ -435,7 +468,9 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 {room.is_read_only && (
                   <>
                     <span>•</span>
-                    <span className="text-orange-400">Read-only</span>
+                    <span className="text-orange-400">
+                      {isOwner ? "Candidates read-only" : "Read-only"}
+                    </span>
                   </>
                 )}
               </div>
@@ -446,7 +481,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 ref={editorRef}
                 language={room.language}
                 theme={room.theme}
-                isReadOnly={room.is_read_only}
+                isReadOnly={editorReadOnly}
                 userName={userName}
                 userColor={userColor}
                 onNameChange={setUserName}

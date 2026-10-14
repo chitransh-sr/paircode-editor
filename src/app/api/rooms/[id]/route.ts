@@ -1,4 +1,4 @@
-import { getRoomRecord, updateRoomRecord, deleteRoomRecord } from "@/lib/rooms/store";
+import { getRoomRecord, updateRoomRecord, deleteRoomRecord, verifyOwnerToken } from "@/lib/rooms/store";
 import { withSecurityHeaders } from "@/lib/security/headers";
 import { executeRateLimiter } from "@/lib/security/rate-limit";
 import type { UpdateRoomInput } from "@/types/room";
@@ -66,6 +66,15 @@ export async function PATCH(
   }
 
   try {
+    // SECURITY: Only the room owner (interviewer) may change room settings.
+    // Candidates calling PATCH directly without the owner token get 403.
+    const ownerToken = request.headers.get("x-room-owner-token");
+    if (!verifyOwnerToken(id, ownerToken)) {
+      return withSecurityHeaders(
+        Response.json({ error: "Only the interviewer can change room settings" }, { status: 403 })
+      );
+    }
+
     const body = await request.json();
 
     const updates: UpdateRoomInput = {};
@@ -104,6 +113,12 @@ export async function DELETE(
   if (!isValidRoomId(id)) {
     return withSecurityHeaders(
       Response.json({ error: "Invalid room ID format" }, { status: 400 })
+    );
+  }
+  // SECURITY: Only the owner may delete the room (same rule as PATCH).
+  if (!verifyOwnerToken(id, _request.headers.get("x-room-owner-token"))) {
+    return withSecurityHeaders(
+      Response.json({ error: "Only the interviewer can delete this room" }, { status: 403 })
     );
   }
   deleteRoomRecord(id);
