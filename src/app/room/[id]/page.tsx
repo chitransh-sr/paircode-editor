@@ -97,18 +97,18 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const editorReadOnly = !!room?.is_read_only && !isOwner;
 
   // Seed the runnable code with the language default on first load and on
-  // language switch (unless the user already typed custom code).
-  // Closes the preview pane when switching to a non-previewable language.
+  // language switch. The editor replaces the shared document with the new
+  // default on switch, so adopt it unconditionally here — otherwise
+  // Run/Preview/Reset would operate on stale code from the previous
+  // language. Closes the preview pane when switching to a non-previewable
+  // language.
   useEffect(() => {
     if (!room) return;
     const langKey = room.language;
     if (lastLangRef.current === langKey) return;
-    const prevDefault = lastLangRef.current
-      ? getLanguage(lastLangRef.current)?.defaultCode ?? ""
-      : "";
     lastLangRef.current = langKey;
     const nextDefault = getLanguage(langKey)?.defaultCode ?? "";
-    setCode((prev) => (prev === "" || prev === prevDefault ? nextDefault : prev));
+    setCode(nextDefault);
     if (!getLanguage(langKey)?.preview) {
       setPreviewOpen(false);
       setPreviewHtml(null);

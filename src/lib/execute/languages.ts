@@ -109,7 +109,10 @@ export const getLanguageByMonaco = (monacoLang: string): LanguageMeta | undefine
 
 /** Resolve a stored room.language value (prefers the unique `name` key, falls back to monaco key for legacy rooms). */
 export const getLanguage = (key: string): LanguageMeta | undefined => {
-  return getLanguageByName(key) ?? getLanguageByMonaco(key);
+  // Legacy alias: rooms created when "jsx" was a valid stored value map to
+  // the React entry so defaults/formatting/preview keep working everywhere.
+  const normalized = key === "jsx" ? "react" : key;
+  return getLanguageByName(normalized) ?? getLanguageByMonaco(normalized);
 };
 
 export const getLanguageById = (id: number): LanguageMeta | undefined => {

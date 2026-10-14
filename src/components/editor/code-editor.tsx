@@ -112,7 +112,6 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
         });
 
         const monacoModel = editor.getModel();
-        const initialCode = yText.toString();
 
         /** Convert a Monaco position to a Yjs relative position. */
         const posToRelative = (pos: monaco.IPosition): Y.RelativePosition | null => {
@@ -247,18 +246,12 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
         if (monacoModel) {
           monacoInstance.editor.setModelLanguage(monacoModel, language || "javascript");
 
-          // Initial code: from the shared Yjs doc (other users typed) or default
-          if (initialCode) {
-            isRemoteChangeRef.current = true;
-            editor.setValue(initialCode);
-            isRemoteChangeRef.current = false;
-          } else {
-            const langMeta = getLanguage(language);
-            if (langMeta) {
-              yText.insert(0, langMeta.defaultCode);
-            }
-          }
-
+          // Default-code guarantee: the Monaco view is created with the
+          // language default already (defaultValue), so report it now —
+          // every entrant immediately sees starter code, for every language.
+          // (Shared-doc seeding happens after the relay sync lands — see
+          // settleSharedDoc below. Seeding blindly here races sync and
+          // duplicates/corrupts content on joins.)
           onCodeChange?.(editor.getValue());
 
           // Bidirectional text sync: Yjs → Monaco
@@ -322,6 +315,44 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
           });
         }
 
+        // Seed-or-adopt the shared doc once the relay sync lands. The Monaco
+        // view already shows the language default, so entrants always see
+        // starter code; the doc itself is seeded only when still empty
+        // after sync (fresh room), otherwise relay content wins (adopt).
+        let settled = false;
+        const settleSharedDoc = () => {
+          if (settled) return;
+          settled = true;
+          const shared = yText.toString();
+          if (shared) {
+            // Existing room: relay content wins — adopt it.
+            if (shared !== editor.getValue()) {
+              isRemoteChangeRef.current = true;
+              editor.setValue(shared);
+              isRemoteChangeRef.current = false;
+              onCodeChange?.(shared);
+            }
+          } else {
+            const langDefault = getLanguage(language)?.defaultCode ?? "";
+            if (langDefault) {
+              // Fresh room: publish the default exactly once.
+              yText.insert(0, langDefault);
+            }
+          }
+        };
+
+        // Normal path: the first relay sync decides seed-vs-adopt.
+        const onSync = (synced: boolean) => {
+          if (synced) {
+            settleSharedDoc();
+            clearTimeout(syncFallback);
+          }
+        };
+        provider.on("sync", onSync);
+        // Fallback: relay unreachable (blocked ws / serverless) — still
+        // publish the local default so the doc is never empty.
+        const syncFallback = setTimeout(settleSharedDoc, 2500);
+
         // Listen for awareness changes (other users join/leave/update)
         awareness.on("change", handleAwarenessChange);
         handleAwarenessChange();
@@ -330,6 +361,8 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
 
         return () => {
           if (cursorDebounceRef.current) clearTimeout(cursorDebounceRef.current);
+          clearTimeout(syncFallback);
+          provider.off("sync", onSync);
           awareness.off("change", handleAwarenessChange);
           awareness.destroy();
           provider.destroy();
