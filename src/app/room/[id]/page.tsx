@@ -211,20 +211,18 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     if (!room || !code) return;
     const lang = getLanguage(room.language);
     if (!lang) return;
-    // Render-only languages (HTML/CSS) open the Preview pane
-    if (lang.name === "html" || lang.name === "css") {
-      setPreviewOpen(true);
-      await rebuildPreview();
-      return;
-    }
-    await execute(code, lang.id);
-    // Keep the visual preview in sync for previewable languages
-    // (JS / TS / React). Run still drives the console; preview drives pixels.
+    // Build the visual preview FIRST (local + instant) so it stays in sync
+    // with the code the moment Run is clicked. Code execution is a server
+    // roundtrip (seconds) — awaiting it first made the preview feel broken.
     if (lang.preview) {
-      if (!previewOpen) setPreviewOpen(true);
-      await rebuildPreview();
+      setPreviewOpen(true);
+      void rebuildPreview();
     }
-  }, [room, code, execute, previewOpen, rebuildPreview]);
+    // Render-only languages (HTML/CSS) are preview-only; anything else
+    // also runs through the execution API for console output.
+    if (lang.name === "html" || lang.name === "css") return;
+    await execute(code, lang.id);
+  }, [room, code, execute, rebuildPreview]);
 
   const canFormat = !!room && FORMATTABLE_LANGUAGES.has(room.language);
 

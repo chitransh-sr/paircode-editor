@@ -41,6 +41,9 @@ const nextConfig = {
           // Strict Content Security Policy
           // - default-src: only same origin
           // - script-src: same origin + 'unsafe-inline' (needed for Next.js runtime + inline scripts)
+          //   + https://esm.sh (the sandboxed live-preview iframe imports React via an
+          //   esm.sh import map; srcDoc frames inherit this policy, so without it the
+          //   preview module is blocked and renders blank white)
           // - style-src: same origin + Google Fonts (for the app itself; sandbox iframes override their own)
           // - img-src: same origin + data: + Google user content (avatars)
           // - connect-src: same origin (for the app's own API)
@@ -54,7 +57,7 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://vercel.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://vercel.com https://esm.sh",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
               "img-src 'self' data: https://avatars.githubusercontent.com https://lh3.googleusercontent.com",
               "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net",

@@ -28,6 +28,7 @@ export function RoomHeader({
   onRoomUpdate,
 }: RoomHeaderProps) {
   const [copied, setCopied] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
@@ -53,6 +54,18 @@ export function RoomHeader({
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }, [room.id]);
+
+  const copyRoomId = useCallback(async () => {
+    const url = `${window.location.origin}/room/${room.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      window.prompt("Copy room link:", url);
+      return;
+    }
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
   }, [room.id]);
 
   const handleLanguageChange = useCallback(
@@ -113,11 +126,36 @@ export function RoomHeader({
           >
             {room.id.slice(0, 8)}
           </button>
+          <button
+            onClick={copyRoomId}
+            className="p-1.5 hover:bg-muted/80 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            title="Copy room link"
+            aria-label="Copy room link"
+          >
+            {copiedId ? (
+              <Check className="w-4 h-4 text-accent" />
+            ) : (
+              <Copy className="w-4 h-4 text-muted-foreground" />
+            )}
+          </button>
           {room.is_private && (
             <Lock className="w-3 h-3 text-accent shrink-0" aria-label="Private room" />
           )}
           {canManage && room.is_private && (
-            <div className="relative">
+            <div className="hidden sm:flex items-center gap-1.5">
+              <span className="text-muted-foreground">Password:</span>
+              <code
+                className="bg-background px-2 py-0.5 rounded text-xs border border-border font-mono max-w-28 truncate"
+                title={
+                  storedPassword
+                    ? showPassword
+                      ? "Room password"
+                      : "Click the eye icon to reveal the password"
+                    : "Not available in this session (only on the device that created the room)"
+                }
+              >
+                {showPassword ? (storedPassword ?? "—") : "••••••"}
+              </code>
               <button
                 onClick={() => setShowPassword(!showPassword)}
                 className="p-1.5 hover:bg-muted/80 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -130,41 +168,19 @@ export function RoomHeader({
                   <Eye className="w-4 h-4 text-muted-foreground" />
                 )}
               </button>
-              {showPassword && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setShowPassword(false)}
-                  />
-                  <div className="absolute top-full left-0 mt-1 w-64 bg-card rounded-md shadow-lg border border-border z-30 p-3">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Lock className="w-3 h-3" /> Room password
-                    </p>
-                    {storedPassword ? (
-                      <div className="flex items-center gap-2">
-                        <code className="flex-1 bg-background px-2 py-1 rounded text-xs border border-border truncate">
-                          {storedPassword}
-                        </code>
-                        <button
-                          onClick={copyPassword}
-                          className="p-1.5 hover:bg-muted/80 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                          title="Copy password"
-                          aria-label="Copy password"
-                        >
-                          {copiedPassword ? (
-                            <Check className="w-4 h-4 text-accent" />
-                          ) : (
-                            <Copy className="w-4 h-4 text-muted-foreground" />
-                          )}
-                        </button>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Not available in this session (only on the device that created the room).
-                      </p>
-                    )}
-                  </div>
-                </>
+              {storedPassword && (
+                <button
+                  onClick={copyPassword}
+                  className="p-1.5 hover:bg-muted/80 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  title="Copy password"
+                  aria-label="Copy password"
+                >
+                  {copiedPassword ? (
+                    <Check className="w-4 h-4 text-accent" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </button>
               )}
             </div>
           )}
