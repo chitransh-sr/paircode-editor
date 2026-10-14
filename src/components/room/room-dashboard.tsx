@@ -68,8 +68,6 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
   const [error, setError] = useState("");
   const [joinError, setJoinError] = useState("");
   const [creating, setCreating] = useState(false);
-  const [createdRoomPassword, setCreatedRoomPassword] = useState<string | null>(null);
-  const [createdRoom, setCreatedRoom] = useState<Room | null>(null);
 
   // Get recent rooms from localStorage (lazy init to avoid setState-in-effect)
   // IMPORTANT: initialize empty on first render so it matches the SSR output
@@ -119,11 +117,10 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
     setError("");
     setCreating(true);
     try {
-      const createdPassword = roomPassword;
       const room = await createRoom({
         language: selectedLanguage,
         is_private: isPrivateRoom,
-        password: isPrivateRoom ? createdPassword : undefined,
+        password: isPrivateRoom ? roomPassword : undefined,
       });
 
       // NOTE: we intentionally do NOT set room-verified-<id> here.
@@ -145,18 +142,11 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       setRoomPassword("");
       setShowCreateModal(false);
 
-      // If private, show the password modal FIRST so the interviewer can
-      // copy/share it — navigation happens via the modal's "Enter Room"
-      // button. For public rooms there is nothing to share, so navigate
-      // immediately.
-      if (isPrivateRoom) {
-        setCreatedRoom(room);
-        setCreatedRoomPassword(createdPassword);
-      } else {
-        setCreatedRoomPassword(null);
-        setCreatedRoom(null);
-        onCreateRoom(room);
-      }
+      // Enter the room immediately (interviewer expectation). The password
+      // remains available inside the room via the eye icon next to the
+      // room ID in the header, and the full link via the Share button —
+      // so nothing needed for sharing is lost by skipping a modal here.
+      onCreateRoom(room);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create room");
     } finally {
@@ -653,92 +643,6 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
         </div>
       )}
 
-      {/* Password Display Modal (shown after creating a private room) */}
-      {createdRoomPassword && createdRoom && (
-        <div>
-          <div className="fixed inset-0 bg-black/50 z-50" onClick={() => { setCreatedRoomPassword(null); setCreatedRoom(null); }} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-card rounded-xl p-6 w-full max-w-md border border-border shadow-xl">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-accent/15 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Lock className="w-8 h-8 text-accent" />
-                </div>
-                <h2 className="text-xl font-semibold text-foreground mb-2">Room Created Successfully!</h2>
-                <p className="text-sm text-muted-foreground">
-                  Share this password with your candidate so they can join the interview.
-                </p>
-              </div>
-
-              <div className="bg-muted/30 rounded-lg p-4 mb-4 border border-border">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Room ID</p>
-                <p className="text-sm font-mono text-foreground break-all break-before">
-                  {createdRoom.id}
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Password</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={createdRoomPassword}
-                      readOnly
-                      className="flex-1 bg-background border border-border rounded px-3 py-2 text-sm font-mono text-foreground focus:outline-none"
-                    />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(createdRoomPassword);
-                      }}
-                      className="px-3 py-2 bg-muted hover:bg-muted/80 rounded transition-colors text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                      title="Copy password to clipboard"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    // Copy the FULL absolute link (with origin) — a relative
-                    // path or truncated ID would land the candidate in the
-                    // wrong room (the server materializes unknown IDs as new
-                    // public rooms with no password).
-                    const fullUrl =
-                      typeof window !== "undefined"
-                        ? `${window.location.origin}/room/${createdRoom.id}`
-                        : `/room/${createdRoom.id}`;
-                    navigator.clipboard.writeText(fullUrl);
-                    setCreatedRoomPassword(null);
-                    setCreatedRoom(null);
-                  }}
-                  className="w-full px-4 py-2 bg-muted text-foreground hover:bg-muted/80 rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                >
-                  Copy Room Link
-                </button>
-
-                <button
-                  onClick={() => {
-                    const target = createdRoom;
-                    setCreatedRoomPassword(null);
-                    setCreatedRoom(null);
-                    onCreateRoom(target);
-                  }}
-                  className="w-full px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                >
-                  Enter Room
-                </button>
-              </div>
-
-              <div className="mt-4 p-3 bg-accent/5 rounded-lg border border-accent/20">
-                <p className="text-xs text-muted-foreground text-center">
-                  The room link has also been saved to your recent rooms.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
