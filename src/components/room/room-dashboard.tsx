@@ -120,11 +120,23 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
     setError("");
     setCreating(true);
     try {
+      const createdPassword = roomPassword;
       const room = await createRoom({
         language: selectedLanguage,
         is_private: isPrivateRoom,
-        password: isPrivateRoom ? roomPassword : undefined,
+        password: isPrivateRoom ? createdPassword : undefined,
       });
+
+      // Creator just set the password, so mark this session as verified.
+      // Otherwise the interviewer lands on /room/:id and hits the
+      // password gate for their own room.
+      if (isPrivateRoom && typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(`room-verified-${room.id}`, "true");
+        } catch {
+          // sessionStorage unavailable — room page will show the gate
+        }
+      }
 
       // Store in localStorage (with the display name), then update state.
       const entry: RecentRoom = { ...room, name: roomName.trim() };
@@ -138,9 +150,12 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       setShowCreateModal(false);
 
       // If private, show the password to the interviewer for sharing
+      // (kept for state completeness; navigation to /room/:id happens
+      // immediately below, so the interviewer sees the editor directly —
+      // the verified flag above is what bypasses the gate).
       if (isPrivateRoom) {
         setCreatedRoom(room);
-        setCreatedRoomPassword(roomPassword);
+        setCreatedRoomPassword(createdPassword);
       } else {
         setCreatedRoomPassword(null);
         setCreatedRoom(null);
