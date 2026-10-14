@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Link2, Briefcase, GraduationCap, Loader2, Lock, ChevronDown } from "lucide-react";
 import type { Room } from "@/types/room";
-import { createRoom, verifyRoomPassword } from "@/hooks/use-room";
+import { createRoom, verifyRoomPassword, isRoomOwner } from "@/hooks/use-room";
 import { LANGUAGES, getLanguage } from "@/lib/execute/languages";
 import { cn } from "@/lib/utils/cn";
 
@@ -168,9 +168,31 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
     }
   };
 
+  /** Switch from the history list to the password step for one room. */
+  const promptHistoryPassword = (roomId: string) => {
+    setJoinInput(roomId);
+    setJoinName(readStoredName());
+    setJoinPassword("");
+    setJoinError("");
+    setShowJoinModal(false);
+    setRequiresPassword(true);
+  };
+
   const handleRecentJoin = async (entry: RecentRoom) => {
     // History Join must enforce the same password step as the join modal —
     // a plain link would skip verification for protected rooms.
+    // The owner (this browser created the room) always joins directly.
+    if (isRoomOwner(entry.id)) {
+      onJoinRoom(entry.id);
+      return;
+    }
+    // The stored entry is authoritative for privacy: is_private never
+    // changes after creation. Anything else (legacy entries) is confirmed
+    // against the server, which is the source of truth.
+    if (entry.is_private === true) {
+      promptHistoryPassword(entry.id);
+      return;
+    }
     if (entry.is_private === false) {
       onJoinRoom(entry.id);
       return;
@@ -182,22 +204,8 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       if (response.ok) {
         const serverRoom: Room = await response.json();
         if (serverRoom.is_private) {
-          let verified = false;
-          try {
-            verified =
-              sessionStorage.getItem(`room-verified-${entry.id}`) === "true";
-          } catch {
-            verified = false;
-          }
-          if (!verified) {
-            setJoinInput(entry.id);
-            setJoinName(readStoredName());
-            setJoinPassword("");
-            setJoinError("");
-            setShowJoinModal(false);
-            setRequiresPassword(true);
-            return;
-          }
+          promptHistoryPassword(entry.id);
+          return;
         }
       }
     } catch {

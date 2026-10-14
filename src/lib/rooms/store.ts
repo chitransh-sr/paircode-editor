@@ -1,4 +1,7 @@
 import { randomUUID, pbkdf2Sync, randomBytes } from "crypto";
+import { readFileSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import type { Room, CreateRoomInput, UpdateRoomInput } from "@/types/room";
 
 /** Generate a PBKDF2 password hash (SHA-256, 100k iterations). */
@@ -31,6 +34,43 @@ export function stripPassword(room: Room): Room {
 
 const rooms = new Map<string, Room>();
 
+// ─── Disk persistence ─────────────────────────────────────────────
+// The store is in-memory by design, but a dev-server restart (or HMR
+// re-evaluation) used to wipe every room — private rooms then came back
+// as public defaults and the password gate was silently bypassed.
+// Persist to the OS temp dir so rooms (including password hashes and
+// owner tokens) survive restarts. Best-effort: memory stays source of
+// truth if the filesystem is unavailable (e.g. read-only serverless).
+const PERSIST_PATH = join(tmpdir(), "paircode-rooms.json");
+
+function persistRooms(): void {
+  try {
+    writeFileSync(PERSIST_PATH, JSON.stringify([...rooms.values()]), "utf-8");
+  } catch {
+    // Ephemeral/unwritable FS — memory remains the source of truth.
+  }
+}
+
+function loadPersistedRooms(): void {
+  try {
+    const raw = readFileSync(PERSIST_PATH, "utf-8");
+    const arr: unknown = JSON.parse(raw);
+    if (!Array.isArray(arr)) return;
+    const now = Date.now();
+    for (const r of arr) {
+      if (!r || typeof (r as Room).id !== "string") continue;
+      const record = r as Room;
+      // Drop expired rooms on load.
+      if (record.expires_at && Date.parse(record.expires_at) < now) continue;
+      rooms.set(record.id, record);
+    }
+  } catch {
+    // First run or unreadable file — start with an empty store.
+  }
+}
+
+loadPersistedRooms();
+
 export function defaultRoom(id: string): Room {
   return {
     id,
@@ -57,6 +97,7 @@ export function createRoomRecord(input: CreateRoomInput): { room: Room; owner_to
     room.password_hash = hashPassword(input.password);
   }
   rooms.set(room.id, room);
+  persistRooms();
   return { room: stripPassword(room), owner_token };
 }
 
@@ -67,6 +108,7 @@ export function getRoomRecord(id: string): Room {
   // Preserve "join with any link" behavior: materialize defaults on demand.
   const room = defaultRoom(id);
   rooms.set(room.id, room);
+  persistRooms();
   return stripPassword(room);
 }
 
@@ -84,6 +126,7 @@ export function updateRoomRecord(id: string, updates: UpdateRoomInput): Room {
   if (updates.theme !== undefined) room.theme = updates.theme;
   if (updates.is_read_only !== undefined) room.is_read_only = updates.is_read_only;
   rooms.set(room.id, room);
+  persistRooms();
   return stripPassword(room);
 }
 
@@ -97,6 +140,7 @@ export function verifyOwnerToken(id: string, token: string | null): boolean {
 
 export function deleteRoomRecord(id: string): void {
   rooms.delete(id);
+  persistRooms();
 }
 
 export function listRoomRecords(limit = 10): Room[] {
