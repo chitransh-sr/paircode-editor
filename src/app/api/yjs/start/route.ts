@@ -6,6 +6,7 @@
  * Call GET /api/yjs/start once on app load to ensure the server is running.
  */
 import { startWebSocketServer } from "@/lib/yjs/websocket-server";
+import { withSecurityHeaders } from "@/lib/security/headers";
 
 export const runtime = "nodejs";
 
@@ -13,13 +14,17 @@ export async function GET(_request: Request) {
   const wss = startWebSocketServer();
   if (!wss) {
     // Port already in use — server is already running from another request.
-    return new Response(
-      JSON.stringify({ status: "already_running", port: 1234 }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
+    return withSecurityHeaders(
+      new Response(
+        JSON.stringify({ status: "already_running", port: 1234 }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
     );
   }
-  return new Response(
-    JSON.stringify({ status: "started", port: 1234 }),
-    { status: 200, headers: { "Content-Type": "application/json" } }
+  return withSecurityHeaders(
+    new Response(
+      JSON.stringify({ status: "started", port: 1234 }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    )
   );
 }

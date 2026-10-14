@@ -27,8 +27,8 @@ export function LanguageSelect({ value, onChange, disabled }: LanguageSelectProp
           disabled && "opacity-50 cursor-not-allowed"
         )}
       >
-        <Globe className="w-4 h-4 text-muted-foreground" />
-        <span>{selectedLang.label}</span>
+        <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
+        <span className="hidden sm:inline">{selectedLang.label}</span>
         <span className="text-muted-foreground">▼</span>
       </button>
 
@@ -39,7 +39,7 @@ export function LanguageSelect({ value, onChange, disabled }: LanguageSelectProp
             onClick={() => setOpen(false)}
           />
           <div className="absolute top-full left-0 mt-1 w-48 bg-popover border border-border rounded-md shadow-lg z-20 max-h-80 overflow-y-auto">
-            {LANGUAGES.map((lang) => (
+            {LANGUAGES.filter((lang) => !lang.hidden).map((lang) => (
               <button
                 key={lang.id}
                 onClick={() => {

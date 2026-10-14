@@ -1,4 +1,4 @@
-import type { LanguageMeta } from "@/types/execution";
+import type { LanguageMeta, RoomFile } from "@/types/execution";
 
 export const LANGUAGES: LanguageMeta[] = [
   {
@@ -22,6 +22,7 @@ export const LANGUAGES: LanguageMeta[] = [
     name: "html",
     label: "HTML",
     monacoLanguage: "html",
+    hidden: true,
     defaultCode: `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <title>Hello, world!</title>\n  </head>\n  <body>\n    <h1>Hello, world!</h1>\n  </body>\n</html>`,
     preview: "html",
   },
@@ -30,8 +31,29 @@ export const LANGUAGES: LanguageMeta[] = [
     name: "css",
     label: "CSS",
     monacoLanguage: "css",
+    hidden: true,
     defaultCode: `body {\n  font-family: system-ui, sans-serif;\n  background: #0f172a;\n  color: #f8fafc;\n  padding: 32px;\n}\n\nh1 {\n  color: #22c55e;\n}\n\nbutton {\n  background: #22c55e;\n  color: #0f172a;\n  border: none;\n  border-radius: 8px;\n  padding: 10px 20px;\n  font-size: 16px;\n}`,
     preview: "css",
+  },
+  {
+    id: 103,
+    name: "web",
+    label: "Web (HTML + CSS)",
+    monacoLanguage: "html",
+    defaultCode: `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>My Page</title>\n  </head>\n  <body>\n    <main class="card">\n      <h1>Hello, world!</h1>\n      <p>Edit the HTML and CSS files — the preview updates live.</p>\n      <button>Click me</button>\n    </main>\n  </body>\n</html>`,
+    preview: "web",
+    files: [
+      {
+        name: "index.html",
+        monacoLanguage: "html",
+        defaultCode: `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>My Page</title>\n  </head>\n  <body>\n    <main class="card">\n      <h1>Hello, world!</h1>\n      <p>Edit the HTML and CSS files — the preview updates live.</p>\n      <button>Click me</button>\n    </main>\n  </body>\n</html>`,
+      },
+      {
+        name: "styles.css",
+        monacoLanguage: "css",
+        defaultCode: `body {\n  font-family: system-ui, sans-serif;\n  background: #0f172a;\n  color: #f8fafc;\n  padding: 32px;\n  margin: 0;\n}\n\n.card {\n  max-width: 560px;\n  margin: 0 auto;\n  background: #1e293b;\n  border-radius: 16px;\n  padding: 32px;\n  text-align: center;\n}\n\nh1 {\n  color: #22c55e;\n  margin-top: 0;\n}\n\nbutton {\n  background: #22c55e;\n  color: #0f172a;\n  border: none;\n  border-radius: 8px;\n  padding: 10px 20px;\n  font-size: 16px;\n  cursor: pointer;\n}`,
+      },
+    ],
   },
   {
     id: 74,
@@ -109,11 +131,31 @@ export const getLanguageByMonaco = (monacoLang: string): LanguageMeta | undefine
 
 /** Resolve a stored room.language value (prefers the unique `name` key, falls back to monaco key for legacy rooms). */
 export const getLanguage = (key: string): LanguageMeta | undefined => {
-  return getLanguageByName(key) ?? getLanguageByMonaco(key);
+  // Legacy alias: rooms created when "jsx" was a valid stored value map to
+  // the React entry so defaults/formatting/preview keep working everywhere.
+  const normalized = key === "jsx" ? "react" : key;
+  return getLanguageByName(normalized) ?? getLanguageByMonaco(normalized);
 };
 
 export const getLanguageById = (id: number): LanguageMeta | undefined => {
   return LANGUAGES.find((lang) => lang.id === id);
+};
+
+/**
+ * File list for a room language. Multi-file modes (Web) return their
+ * defined files; single-file languages synthesize one entry so the editor
+ * and preview can treat every mode uniformly.
+ */
+export const getRoomFiles = (key: string): RoomFile[] => {
+  const meta = getLanguage(key);
+  if (!meta) {
+    return [{ name: "main.txt", monacoLanguage: "plaintext", defaultCode: "" }];
+  }
+  if (meta.files?.length) return meta.files;
+  const ext = meta.monacoLanguage === "plaintext" ? "txt" : meta.monacoLanguage;
+  return [
+    { name: `main.${ext}`, monacoLanguage: meta.monacoLanguage, defaultCode: meta.defaultCode ?? "" },
+  ];
 };
 
 /** Language `name` keys supported by the Format feature (Prettier). */

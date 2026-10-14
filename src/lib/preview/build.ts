@@ -8,6 +8,15 @@ function escapeScript(code: string): string {
   return code.replace(/<\/script/gi, "<\\/script");
 }
 
+/** Generate a cryptographically secure nonce for CSP script tags. */
+function generateNonce(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().replace(/-/g, "");
+  }
+  // Fallback: use a random hex string
+  return Math.random().toString(16).slice(2, 18) + Math.random().toString(16).slice(2, 18);
+}
+
 /** Escape user CSS embedded inside an inline <style> block. */
 function escapeStyle(code: string): string {
   return code.replace(/<\/style/gi, "<\\/style");
@@ -109,6 +118,32 @@ ${escapeScript(js)}
 </html>`;
 }
 
+function webPage(html: string, css: string): string {
+  const styleTag = `\n    <style>\n${escapeStyle(css)}\n    </style>`;
+  if (/<\/head\s*>/i.test(html)) {
+    return html.replace(/<\/head\s*>/i, `${styleTag}\n  </head>`);
+  }
+  if (/<html[^>]*>/i.test(html)) {
+    return html.replace(/<html[^>]*>/i, (m) => `${m}\n  <head>${styleTag}\n  </head>`);
+  }
+  return `<!DOCTYPE html>
+<html>
+  <head>${styleTag}
+  </head>
+  <body>
+${html}
+  </body>
+</html>`;
+}
+
+/** Merged HTML+CSS document for Web (multi-file) rooms. */
+export function buildWebPreviewHtml(htmlCode: string, cssCode: string): string {
+  if (!htmlCode.trim() && !cssCode.trim()) {
+    return placeholderPage("Start typing to see a live preview…");
+  }
+  return webPage(htmlCode, cssCode);
+}
+
 async function toPlainJs(
   code: string,
   transforms: ("typescript" | "jsx" | "imports")[],
@@ -179,15 +214,26 @@ async function reactPage(code: string): Promise<string> {
   // SyntaxError anywhere but the module top level. It must stay outside any
   // try{} / IIFE block — previously it was inside `try {`, so the whole
   // module failed to parse and the preview stayed blank white with no error.
+
+  // Security: pin the exact React version so esm.sh can't silently swap a
+  // different major under us (supply-chain mitigation). The nonce below is
+  // generated per build and mirrored into the frame's own CSP — module
+  // scripts ignore 'unsafe-inline', so without a matching nonce the whole
+  // preview stays blank white.
+  const REACT_VERSION = "19.3.0";
+  const nonce = generateNonce();
+
   return `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8" />
-    <script type="importmap">
+    <!-- Security: Restrict this sandbox frame's own CSP -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' https://esm.sh; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src https://fonts.gstatic.com; connect-src 'none'; object-src 'none'; base-uri 'none';">
+    <script type="importmap" nonce="${nonce}">
       {
         "imports": {
-          "react": "https://esm.sh/react@${reactVersion}",
-          "react-dom/": "https://esm.sh/react-dom@${reactVersion}/"
+          "react": "https://esm.sh/react@${REACT_VERSION}",
+          "react-dom/": "https://esm.sh/react-dom@${REACT_VERSION}/"
         }
       }
     </script>
@@ -204,7 +250,7 @@ async function reactPage(code: string): Promise<string> {
   <body>
     <div id="root"></div>
     <div id="__err"></div>
-    <script type="module">
+    <script type="module" nonce="${nonce}">
       function showError(m) {
         var el = document.getElementById("__err");
         if (el) el.textContent = "Error: " + m;
@@ -232,8 +278,14 @@ ${escapeScript(compiled)}
 /** Build a complete sandboxed preview document for the given strategy + code. */
 export async function buildPreviewHtml(
   strategy: PreviewStrategy,
-  code: string
+  code: string | { html: string; css: string }
 ): Promise<string> {
+  if (typeof code !== "string") {
+    if (!code.html.trim() && !code.css.trim()) {
+      return placeholderPage("Start typing to see a live preview…");
+    }
+    return webPage(code.html, code.css);
+  }
   if (!code.trim()) {
     return placeholderPage("Start typing to see a live preview…");
   }
@@ -246,5 +298,7 @@ export async function buildPreviewHtml(
       return scriptPage(code);
     case "react":
       return reactPage(code);
+    case "web":
+      return webPage(code, "");
   }
 }

@@ -1,7 +1,26 @@
 import type { ExecutionResult } from "@/types/execution";
+import { withSecurityHeaders } from "@/lib/security/headers";
+import { executeRateLimiter } from "@/lib/security/rate-limit";
 
 // Force Node.js runtime for child_process access
 export const runtime = "nodejs";
+
+// ─── Security Constants ───────────────────────────────────────────
+const MAX_CODE_LENGTH = 10_000; // Maximum characters for user-submitted code
+const MAX_STDIN_LENGTH = 5_000; // Maximum characters for stdin input
+const SUPPORTED_LANGUAGES = new Set([74, 100, 63, 71, 60, 72, 68, 73, 50, 54]); // TS, JSX, JS, Py, Go, Ruby, PHP, Rust, C, C++
+
+/** Extract client IP from request headers or connection info. */
+function getClientIp(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  const cfConnecting = request.headers.get("cf-connecting-ip");
+  if (cfConnecting) return cfConnecting;
+  // Fallback to x-real-ip or unknown
+  return request.headers.get("x-real-ip") || "unknown";
+}
 
 // Map language IDs to file extensions
 const LANGUAGE_EXTENSIONS: Record<number, string> = {
@@ -46,39 +65,130 @@ async function removeDir(dirPath: string): Promise<void> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    // ─── Rate Limiting ──────────────────────────────────────────────
+    const clientIp = getClientIp(request);
+    const rateCheck = executeRateLimiter.check(clientIp);
+    if (!rateCheck.allowed) {
+      return withSecurityHeaders(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: "Rate limit exceeded. Please try again later.",
+          } as ExecutionResult),
+          {
+            status: 429,
+            headers: {
+              "Content-Type": "application/json",
+              "Retry-After": String(
+                Math.ceil((rateCheck.resetTime - Date.now()) / 1000)
+              ),
+            },
+          }
+        ),
+        {
+          "X-RateLimit-Limit": "20",
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(Math.ceil(rateCheck.resetTime / 1000)),
+          "Retry-After": String(
+            Math.ceil((rateCheck.resetTime - Date.now()) / 1000)
+          ),
+        }
+      );
+    }
+
     const { code, languageId, stdin } = await request.json();
 
-    if (!code || !languageId) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Code and languageId are required",
-        } as ExecutionResult),
-        { status: 400 }
+    // ─── Input Validation ─────────────────────────────────────────
+    if (!code || typeof code !== "string") {
+      return withSecurityHeaders(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: "Code is required and must be a string",
+          } as ExecutionResult),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        ),
+        { "X-RateLimit-Limit": "20", "X-RateLimit-Remaining": String(rateCheck.remaining) }
+      );
+    }
+
+    if (!languageId || !SUPPORTED_LANGUAGES.has(languageId)) {
+      return withSecurityHeaders(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: `Invalid languageId ${languageId}. Supported: ${Array.from(SUPPORTED_LANGUAGES).join(", ")}`,
+          } as ExecutionResult),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        ),
+        { "X-RateLimit-Limit": "20", "X-RateLimit-Remaining": String(rateCheck.remaining) }
+      );
+    }
+
+    if (code.length > MAX_CODE_LENGTH) {
+      return withSecurityHeaders(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: `Code exceeds maximum length of ${MAX_CODE_LENGTH} characters`,
+          } as ExecutionResult),
+          { status: 413, headers: { "Content-Type": "application/json" } }
+        ),
+        { "X-RateLimit-Limit": "20", "X-RateLimit-Remaining": String(rateCheck.remaining) }
+      );
+    }
+
+    if (stdin && stdin.length > MAX_STDIN_LENGTH) {
+      return withSecurityHeaders(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: `Stdin exceeds maximum length of ${MAX_STDIN_LENGTH} characters`,
+          } as ExecutionResult),
+          { status: 413, headers: { "Content-Type": "application/json" } }
+        ),
+        { "X-RateLimit-Limit": "20", "X-RateLimit-Remaining": String(rateCheck.remaining) }
       );
     }
 
     // Render-only languages (HTML/CSS) have no compiler — use Preview instead
     if (languageId === 101 || languageId === 102) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "HTML and CSS can't be executed — open the Preview tab instead",
-        } as ExecutionResult),
-        { status: 400 }
+      return withSecurityHeaders(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: "HTML and CSS can't be executed — open the Preview tab instead",
+          } as ExecutionResult),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        ),
+        { "X-RateLimit-Limit": "20", "X-RateLimit-Remaining": String(rateCheck.remaining) }
       );
     }
 
     const result = await executeCodeLocally(code, languageId, stdin || "");
 
-    return new Response(JSON.stringify(result), { status: 200 });
+    return withSecurityHeaders(
+      new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+      {
+        "X-RateLimit-Limit": "20",
+        "X-RateLimit-Remaining": String(rateCheck.remaining),
+      }
+    );
   } catch (error) {
     console.error("Execution error:", error);
-    const result: ExecutionResult = {
-      success: false,
-      error: error instanceof Error ? error.message : "Execution failed",
-    };
-    return new Response(JSON.stringify(result), { status: 500 });
+    return withSecurityHeaders(
+      new Response(
+        JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : "Execution failed",
+        } as ExecutionResult),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      ),
+      { "X-RateLimit-Limit": "20", "X-RateLimit-Remaining": "0" }
+    );
   }
 }
 
@@ -96,6 +206,11 @@ async function executeCodeLocally(
   const timeout = 5000;
   const maxBuffer = 1024 * 1024; // 1MB
 
+  const SANITIZED_ENV = {
+    NODE_ENV: "production",
+    PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
+  };
+
   // Helper to run a command with timeout
   const runCommand = async (
     cmd: string,
@@ -109,6 +224,8 @@ async function executeCodeLocally(
       input,
       cwd,
       killSignal: "SIGKILL" as const,
+      // SECURITY: Never forward process.env — use a sanitized minimal env
+      env: SANITIZED_ENV,
     } as Record<string, unknown>);
   };
 
@@ -329,11 +446,11 @@ async function executeJsx(
       input: stdin,
       cwd: execDir,
       killSignal: "SIGKILL" as const,
-      // Let `require("react")` / `require("react-dom/server")` resolve to
-      // the project's own node_modules from the temp exec dir.
+      // SECURITY: Only pass NODE_ENV, PATH, and NODE_PATH — never forward
+      // process.env which may contain secrets (API keys, DB credentials, etc.)
       env: {
-        ...process.env,
         NODE_ENV: "production",
+        PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
         NODE_PATH: join(process.cwd(), "node_modules"),
       },
     } as Record<string, unknown>);
@@ -393,6 +510,11 @@ async function executeCompiled(
       timeout: 15000,
       maxBuffer: 1024 * 1024,
       cwd: execDir,
+      // SECURITY: Sanitized environment
+      env: {
+        NODE_ENV: "production",
+        PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
+      },
     });
   } catch (error: unknown) {
     const err = error as ExecError;
@@ -411,6 +533,11 @@ async function executeCompiled(
       input: stdin,
       cwd: execDir,
       killSignal: "SIGKILL" as const,
+      // SECURITY: Sanitized environment
+      env: {
+        NODE_ENV: "production",
+        PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
+      },
     } as Record<string, unknown>) as { stdout: string; stderr: string };
     return finish(stdout, stderr, 0);
   } catch (error: unknown) {
@@ -464,6 +591,11 @@ async function executeTypeScript(
         input: stdin,
         cwd: execDir,
         killSignal: "SIGKILL",
+        // SECURITY: Sanitized environment
+        env: {
+          NODE_ENV: "production",
+          PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
+        },
       }
     );
 
@@ -517,6 +649,11 @@ async function executeJava(
       timeout: 10000,
       maxBuffer: 1024 * 1024,
       cwd: execDir,
+      // SECURITY: Sanitized environment
+      env: {
+        NODE_ENV: "production",
+        PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
+      },
     });
 
     // Run
@@ -528,6 +665,11 @@ async function executeJava(
         maxBuffer: 1024 * 1024,
         input: stdin,
         cwd: execDir,
+        // SECURITY: Sanitized environment
+        env: {
+          NODE_ENV: "production",
+          PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
+        },
       }
     );
 
