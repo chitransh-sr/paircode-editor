@@ -1,20 +1,69 @@
 import { createRoomRecord, listRoomRecords } from "@/lib/rooms/store";
+import { withSecurityHeaders } from "@/lib/security/headers";
+import { executeRateLimiter } from "@/lib/security/rate-limit";
+
+/** Validate language value against supported set. */
+function sanitizeLanguage(lang: unknown): string {
+  const valid = ["javascript", "typescript", "jsx", "react", "html", "css", "python", "go", "rust", "c", "cpp", "java", "ruby", "php"];
+  if (typeof lang === "string" && valid.includes(lang)) return lang;
+  return "javascript";
+}
+
+/** Validate theme value against supported set. */
+function sanitizeTheme(theme: unknown): string {
+  const valid = ["vs-dark", "light", "hc-black", "github-dark", "one-dark"];
+  if (typeof theme === "string" && valid.includes(theme)) return theme;
+  return "vs-dark";
+}
+
+/** Extract client IP from request. */
+function getClientIp(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (typeof forwarded === "string") return forwarded.split(",")[0].trim();
+  return request.headers.get("x-real-ip") || "api-client";
+}
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json().catch(() => ({}));
-    const { language = "javascript", theme = "vs-dark" } = body;
+    // Rate limit
+    const clientIp = getClientIp(request);
+    const rateCheck = executeRateLimiter.check(clientIp);
+    if (!rateCheck.allowed) {
+      return withSecurityHeaders(
+        new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+          status: 429,
+          headers: {
+            "Content-Type": "application/json",
+            "Retry-After": String(Math.ceil((rateCheck.resetTime - Date.now()) / 1000)),
+          },
+        })
+      );
+    }
 
-    return Response.json(createRoomRecord({ language, theme }), { status: 201 });
+    const body = await request.json().catch(() => ({}));
+    // SECURITY: Sanitize all inputs — only allow known-safe values
+    const language = sanitizeLanguage(body.language);
+    const theme = sanitizeTheme(body.theme);
+
+    return withSecurityHeaders(
+      Response.json(createRoomRecord({ language, theme }), { status: 201 }),
+      {
+        "X-RateLimit-Limit": "20",
+        "X-RateLimit-Remaining": String(rateCheck.remaining),
+      }
+    );
   } catch (error) {
     console.error("Server error:", error);
-    return Response.json({ error: "Internal server error" }, { status: 500 });
+    return withSecurityHeaders(
+      Response.json({ error: "Internal server error" }, { status: 500 })
+    );
   }
 }
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const limit = parseInt(url.searchParams.get("limit") || "10", 10);
+  // SECURITY: Clamp limit to prevent excessive data fetching
+  const limit = Math.min(parseInt(url.searchParams.get("limit") || "10", 10), 100);
 
-  return Response.json(listRoomRecords(limit));
+  return withSecurityHeaders(Response.json(listRoomRecords(isNaN(limit) ? 10 : limit)));
 }

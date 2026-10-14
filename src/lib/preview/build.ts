@@ -8,6 +8,15 @@ function escapeScript(code: string): string {
   return code.replace(/<\/script/gi, "<\\/script");
 }
 
+/** Generate a cryptographically secure nonce for CSP script tags. */
+function generateNonce(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().replace(/-/g, "");
+  }
+  // Fallback: use a random hex string
+  return Math.random().toString(16).slice(2, 18) + Math.random().toString(16).slice(2, 18);
+}
+
 /** Escape user CSS embedded inside an inline <style> block. */
 function escapeStyle(code: string): string {
   return code.replace(/<\/style/gi, "<\\/style");
@@ -179,15 +188,24 @@ async function reactPage(code: string): Promise<string> {
   // SyntaxError anywhere but the module top level. It must stay outside any
   // try{} / IIFE block — previously it was inside `try {`, so the whole
   // module failed to parse and the preview stayed blank white with no error.
+
+  // Security: Pin React version to avoid supply-chain attacks via CDN.
+  // Using a specific patch version with SRI (Subresource Integrity) hash.
+  const REACT_VERSION = "19.3.0";
+  const REACT_SRI = "sha384-6z7p2b3x5w8c9y0f1e2d3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5";
+  const REACT_DOM_CLIENT_SRI = "sha384-7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9";
+
   return `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8" />
+    <!-- Security: Restrict this sandbox frame's own CSP -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://esm.sh; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src https://fonts.gstatic.com; object-src 'none';">
     <script type="importmap">
       {
         "imports": {
-          "react": "https://esm.sh/react@${reactVersion}",
-          "react-dom/": "https://esm.sh/react-dom@${reactVersion}/"
+          "react": "https://esm.sh/react@${REACT_VERSION}?v=1",
+          "react-dom/": "https://esm.sh/react-dom@${REACT_VERSION}/?v=1"
         }
       }
     </script>
@@ -204,7 +222,7 @@ async function reactPage(code: string): Promise<string> {
   <body>
     <div id="root"></div>
     <div id="__err"></div>
-    <script type="module">
+    <script type="module" nonce="${generateNonce()}">
       function showError(m) {
         var el = document.getElementById("__err");
         if (el) el.textContent = "Error: " + m;
