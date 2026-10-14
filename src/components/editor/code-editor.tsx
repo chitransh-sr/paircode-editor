@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
-import Editor from "@monaco-editor/react";
+import Editor, { loader } from "@monaco-editor/react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 // y-monaco's MonacoBinding would sync text and render cursors, but its deep
@@ -10,11 +10,28 @@ import { WebsocketProvider } from "y-websocket";
 //  1. Text sync via doc.on("update") + monacoModel.onDidChangeContent()
 //  2. Cursor tracking via Y.createRelativePosition → awareness
 //  3. Remote cursor rendering via monaco editor deltaDecorations()
-import * as monaco from "monaco-editor";
+// NOTE: `monaco-editor` is imported as a type only. A static runtime import
+// pulls the entire ~5MB editor into the client bundle (slow first load) and
+// crashes SSR (monaco touches `window`/`self` at module scope). The real
+// runtime instance comes from @monaco-editor/react's loader via `onMount`
+// (see `monacoInstance` below), pinned to the installed version over CDN.
+import type * as monaco from "monaco-editor";
 import { getLanguage } from "@/lib/execute/languages";
 import { getUserColor, getUserInitials } from "@/lib/presence/colors";
 import { getWsUrl } from "@/lib/yjs/ws-client";
 import type { UserPresence } from "@/types/presence";
+
+// Pin the loader to the installed monaco-editor version over CDN so the
+// <Editor> mount doesn't fetch an unpinned (and CSP-blocked) `latest`.
+// Must match the `monaco-editor` version in package.json.
+const MONACO_VS_CDN = "https://cdn.jsdelivr.net/npm/monaco-editor@0.57.0/min/vs";
+if (typeof window !== "undefined") {
+  try {
+    loader.config({ paths: { vs: MONACO_VS_CDN } });
+  } catch {
+    // Non-fatal: loader falls back to its default CDN path.
+  }
+}
 
 /** Convert a hex color ("#ff0000" or "ff0000") to an [r, g, b] tuple. */
 function hexToRgb(hex: string): [number, number, number] | null {
