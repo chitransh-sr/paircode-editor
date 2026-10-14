@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Plus, Link2, Briefcase, GraduationCap, Loader2, Lock } from "lucide-react";
+import { Plus, Link2, Briefcase, GraduationCap, Loader2, Lock, ChevronDown } from "lucide-react";
 import type { Room } from "@/types/room";
 import { createRoom, verifyRoomPassword } from "@/hooks/use-room";
 import { LANGUAGES, getLanguage } from "@/lib/execute/languages";
@@ -319,24 +319,25 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       {showCreateModal && (
         <div>
           <div
-            className="fixed inset-0 bg-black/50 z-50"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
             onClick={closeModals}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-card rounded-xl p-6 w-full max-w-md border border-border shadow-xl"
+            <div className="bg-card rounded-2xl p-6 w-full max-w-md border border-border shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-xl font-semibold mb-4 text-foreground">Create Interview Room</h2>
+              <h2 className="text-xl font-semibold mb-1 text-foreground">Create Interview Room</h2>
+              <p className="text-sm text-muted-foreground mb-5">Set up a private room and share the password with your candidate.</p>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-foreground">Room Name</label>
+                  <label className="block text-sm font-medium mb-1.5 text-foreground">Room Name</label>
                   <input
                     type="text"
                     value={roomName}
                     onChange={(e) => setRoomName(e.target.value)}
                     placeholder="e.g., Frontend Interview - John"
-                    className="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
+                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition"
                     maxLength={50}
                     autoFocus
                     onKeyDown={(e) => {
@@ -349,47 +350,50 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-foreground">Language</label>
-                  <select
-                    value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value)}
-                    className="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
-                  >
-                    {LANGUAGES.map((lang) => (
-                      <option key={lang.id} value={lang.name}>
-                        {lang.label}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="block text-sm font-medium mb-1.5 text-foreground">Language</label>
+                  <div className="relative">
+                    <select
+                      value={selectedLanguage}
+                      onChange={(e) => setSelectedLanguage(e.target.value)}
+                      className="w-full appearance-none bg-background border border-border rounded-lg pl-3.5 pr-10 py-2.5 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition cursor-pointer"
+                    >
+                      {LANGUAGES.map((lang) => (
+                        <option key={lang.id} value={lang.name}>
+                          {lang.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2" />
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-2">
+                <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
                   <input
                     type="checkbox"
                     id="private-room"
                     checked={isPrivateRoom}
                     onChange={(e) => setIsPrivateRoom(e.target.checked)}
-                    className="w-4 h-4 rounded border-border text-accent focus:ring-accent"
+                    className="w-4 h-4 rounded border-border text-accent focus:ring-accent/60"
                   />
-                  <label htmlFor="private-room" className="text-sm text-foreground cursor-pointer">
-                    Private room (password protected)
+                  <label htmlFor="private-room" className="text-sm text-foreground cursor-pointer select-none">
+                    Private room <span className="text-muted-foreground">(password protected)</span>
                   </label>
                 </div>
 
                 {isPrivateRoom && (
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-foreground">Room Password</label>
+                    <label className="block text-sm font-medium mb-1.5 text-foreground">Room Password</label>
                     <input
                       type="password"
                       value={roomPassword}
                       onChange={(e) => setRoomPassword(e.target.value)}
                       placeholder="Minimum 4 characters"
-                      className="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
+                      className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground font-mono placeholder:text-muted-foreground/60 placeholder:font-sans shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition"
                       maxLength={128}
                       minLength={4}
                       autoComplete="new-password"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground mt-1.5">
                       Share this password with your candidate so they can join.
                     </p>
                   </div>
@@ -399,11 +403,11 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                   <p className="text-sm text-destructive">{error}</p>
                 )}
 
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-3 pt-1">
                   <button
                     onClick={closeModals}
                     disabled={creating}
-                    className="flex-1 px-4 py-2 bg-muted text-foreground hover:bg-muted/80 rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    className="flex-1 px-4 py-2.5 bg-muted text-foreground hover:bg-muted/80 rounded-lg transition text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   >
                     Cancel
                   </button>
@@ -411,10 +415,10 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     onClick={handleCreateRoom}
                     disabled={creating || !roomName.trim()}
                     className={cn(
-                      "flex-1 px-4 py-2 rounded transition-all text-sm font-medium flex items-center justify-center gap-2",
+                      "flex-1 px-4 py-2.5 rounded-lg transition-all text-sm font-medium flex items-center justify-center gap-2",
                       creating || !roomName.trim()
                         ? "bg-muted cursor-not-allowed text-muted-foreground"
-                        : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-md hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                     )}
                   >
                     {creating && <Loader2 className="w-4 h-4 animate-spin" />}

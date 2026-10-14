@@ -189,23 +189,25 @@ async function reactPage(code: string): Promise<string> {
   // try{} / IIFE block — previously it was inside `try {`, so the whole
   // module failed to parse and the preview stayed blank white with no error.
 
-  // Security: Pin React version to avoid supply-chain attacks via CDN.
-  // Using a specific patch version with SRI (Subresource Integrity) hash.
+  // Security: pin the exact React version so esm.sh can't silently swap a
+  // different major under us (supply-chain mitigation). The nonce below is
+  // generated per build and mirrored into the frame's own CSP — module
+  // scripts ignore 'unsafe-inline', so without a matching nonce the whole
+  // preview stays blank white.
   const REACT_VERSION = "19.3.0";
-  const REACT_SRI = "sha384-6z7p2b3x5w8c9y0f1e2d3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5";
-  const REACT_DOM_CLIENT_SRI = "sha384-7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9";
+  const nonce = generateNonce();
 
   return `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8" />
     <!-- Security: Restrict this sandbox frame's own CSP -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://esm.sh; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src https://fonts.gstatic.com; object-src 'none';">
-    <script type="importmap">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' https://esm.sh; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src https://fonts.gstatic.com; connect-src 'none'; object-src 'none'; base-uri 'none';">
+    <script type="importmap" nonce="${nonce}">
       {
         "imports": {
-          "react": "https://esm.sh/react@${REACT_VERSION}?v=1",
-          "react-dom/": "https://esm.sh/react-dom@${REACT_VERSION}/?v=1"
+          "react": "https://esm.sh/react@${REACT_VERSION}",
+          "react-dom/": "https://esm.sh/react-dom@${REACT_VERSION}/"
         }
       }
     </script>
@@ -222,7 +224,7 @@ async function reactPage(code: string): Promise<string> {
   <body>
     <div id="root"></div>
     <div id="__err"></div>
-    <script type="module" nonce="${generateNonce()}">
+    <script type="module" nonce="${nonce}">
       function showError(m) {
         var el = document.getElementById("__err");
         if (el) el.textContent = "Error: " + m;
