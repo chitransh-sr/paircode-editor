@@ -12,7 +12,7 @@ function isValidRoomId(id: string): boolean {
 /** Sanitize language — only allow known values. */
 function sanitizeLanguage(lang: unknown): string | undefined {
   if (lang === undefined) return undefined;
-  const valid = ["javascript", "typescript", "jsx", "react", "html", "css", "python", "go", "rust", "c", "cpp", "java", "ruby", "php"];
+  const valid = ["javascript", "typescript", "jsx", "react", "web", "html", "css", "python", "go", "rust", "c", "cpp", "java", "ruby", "php"];
   if (typeof lang === "string" && valid.includes(lang)) return lang;
   return undefined;
 }

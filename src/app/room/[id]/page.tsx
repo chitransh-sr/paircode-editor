@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, use, useRef, useId } from "react";
+import { useState, useEffect, useCallback, use, useRef, useId, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle, RefreshCw, Trash2, Check, Wand2, Eye, RotateCcw, Globe } from "lucide-react";
 import { RoomHeader } from "@/components/room/room-header";
@@ -14,7 +14,7 @@ import { PresenceBar } from "@/components/editor/presence-bar";
 import { useRoom, isRoomOwner, sanitizeStoredName } from "@/hooks/use-room";
 import { useLocalStorage } from "@/hooks/use-mobile";
 import { useExecution } from "@/hooks/use-execution";
-import { getLanguage, FORMATTABLE_LANGUAGES } from "@/lib/execute/languages";
+import { getLanguage, FORMATTABLE_LANGUAGES, getRoomFiles } from "@/lib/execute/languages";
 import { buildPreviewHtml, stripTypeScript, previewError } from "@/lib/preview/build";
 import { getUserColor } from "@/lib/presence/colors";
 import type { Room, UpdateRoomInput } from "@/types/room";
@@ -45,7 +45,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const [snapshotSaved, setSnapshotSaved] = useState(false);
   const [formatting, setFormatting] = useState(false);
   const [formatMsg, setFormatMsg] = useState<string | null>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(true);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const editorRef = useRef<CodeEditorHandle | null>(null);
   const lastLangRef = useRef<string | null>(null);
@@ -96,19 +96,38 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   // keeps full edit access so they can demonstrate and assist.
   const editorReadOnly = !!room?.is_read_only && !isOwner;
 
-  // Seed the runnable code with the language default on first load and on
-  // language switch. The editor replaces the shared document with the new
-  // default on switch, so adopt it unconditionally here — otherwise
-  // Run/Preview/Reset would operate on stale code from the previous
-  // language. Closes the preview pane when switching to a non-previewable
-  // language.
+  // Multi-file modes (Web: index.html + styles.css): file list follows the
+  // room language; the visible file is local per user while content stays
+  // shared via Yjs.
+  const roomFiles = useMemo(
+    () => getRoomFiles(room?.language ?? "javascript"),
+    [room?.language]
+  );
+  const [activeFile, setActiveFile] = useState<string>("");
+  const activeFileRef = useRef<string>("");
+  useEffect(() => {
+    activeFileRef.current = activeFile;
+  }, [activeFile]);
+  // Bumped on ANY file change (background files included) so the live
+  // preview rebuilds even when the edited file isn't visible.
+  const [filesTick, setFilesTick] = useState(0);
+  const handleActiveFileChange = useCallback((name: string) => {
+    setActiveFile(name);
+    // File content follows via onCodeChange from the editor on switch.
+  }, []);
+
+  // Seed the runnable code with the first file's default on first load and
+  // on language switch (the editor replaces every shared file the same
+  // way), so Run/Preview/Reset always match what's on screen.
+  // Closes the preview pane when switching to a non-previewable language.
   useEffect(() => {
     if (!room) return;
     const langKey = room.language;
     if (lastLangRef.current === langKey) return;
     lastLangRef.current = langKey;
-    const nextDefault = getLanguage(langKey)?.defaultCode ?? "";
-    setCode(nextDefault);
+    const files = getRoomFiles(langKey);
+    setActiveFile(files[0]?.name ?? "");
+    setCode(files[0]?.defaultCode ?? "");
     if (!getLanguage(langKey)?.preview) {
       setPreviewOpen(false);
       setPreviewHtml(null);
@@ -151,8 +170,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     [fetchRoomUpdate, fetchedRoom, isOwner, editorReadOnly]
   );
 
-  const handleCodeChange = useCallback((newCode: string) => {
-    setCode(newCode);
+  const handleCodeChange = useCallback((newCode: string, fileName?: string) => {
+    // Background-file edits must not clobber the active code state, but
+    // they still bump the files tick so the live preview rebuilds.
+    if (!fileName || fileName === activeFileRef.current) setCode(newCode);
+    setFilesTick((t) => t + 1);
   }, []);
 
   const handlePresenceChange = useCallback((users: UserPresence[]) => {
@@ -200,27 +222,54 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       return;
     }
     try {
-      const source =
-        room.language === "typescript" ? await stripTypeScript(code) : code;
-      setPreviewHtml(await buildPreviewHtml(strategy, source));
+      if (strategy === "web") {
+        // Merged preview reads both files live from the editor (the page
+        // only tracks the visible file's code in state).
+        const fileCode = (name: string) =>
+          editorRef.current?.getFileCode(name) ??
+          roomFiles.find((f) => f.name === name)?.defaultCode ??
+          "";
+        setPreviewHtml(
+          await buildPreviewHtml(strategy, {
+            html: fileCode("index.html"),
+            css: fileCode("styles.css"),
+          })
+        );
+      } else {
+        const source =
+          room.language === "typescript" ? await stripTypeScript(code) : code;
+        setPreviewHtml(await buildPreviewHtml(strategy, source));
+      }
     } catch {
       setPreviewHtml(previewError("Could not build preview."));
     } finally {
-      previewSigRef.current = previewSig(code, room.language);
+      previewSigRef.current =
+        room.language === "web"
+          ? `web\n${roomFiles
+              .map((f) => editorRef.current?.getFileCode(f.name) ?? "")
+              .join("\n###\n")}`
+          : previewSig(code, room.language);
     }
-  }, [room, code]);
+  }, [room, code, roomFiles]);
 
   // Live preview: rebuild debounced while typing with the preview open.
   // Skips entirely when code+language already match the built preview, so
-  // background polls never blink the iframe.
+  // background polls never blink the iframe. Web mode compares all files.
   useEffect(() => {
     if (!previewOpen || !previewSupported) return;
-    if (previewSigRef.current === previewSig(code, room?.language ?? "")) return;
+    const langKey = room?.language ?? "";
+    const sig =
+      langKey === "web"
+        ? `web\n${roomFiles
+            .map((f) => editorRef.current?.getFileCode(f.name) ?? "")
+            .join("\n###\n")}`
+        : previewSig(code, langKey);
+    if (previewSigRef.current === sig) return;
     const timer = setTimeout(() => {
       rebuildPreview();
     }, 700);
     return () => clearTimeout(timer);
-  }, [previewOpen, previewSupported, rebuildPreview, room?.language, code]);
+  }, [previewOpen, previewSupported, rebuildPreview, room?.language, code, roomFiles, filesTick]);
 
   const handleTogglePreview = useCallback(() => {
     // Build immediately when opening so the pane never sits blank white.
@@ -228,13 +277,20 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     // rebuild when the stored preview already matches — no blink.
     if (!previewOpen) {
       setPreviewOpen(true);
-      if (previewSigRef.current !== previewSig(code, room?.language ?? "")) {
+      const langKey = room?.language ?? "";
+      const sig =
+        langKey === "web"
+          ? `web\n${roomFiles
+              .map((f) => editorRef.current?.getFileCode(f.name) ?? "")
+              .join("\n###\n")}`
+          : previewSig(code, langKey);
+      if (previewSigRef.current !== sig) {
         rebuildPreview();
       }
     } else {
       setPreviewOpen(false);
     }
-  }, [previewOpen, rebuildPreview, code, room?.language]);
+  }, [previewOpen, rebuildPreview, code, room?.language, roomFiles]);
 
   const handleRun = useCallback(async () => {
     if (!room || !code) return;
@@ -247,9 +303,9 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       setPreviewOpen(true);
       void rebuildPreview();
     }
-    // Render-only languages (HTML/CSS) are preview-only; anything else
+    // Render-only languages (HTML/CSS/Web) are preview-only; anything else
     // also runs through the execution API for console output.
-    if (lang.name === "html" || lang.name === "css") return;
+    if (lang.name === "html" || lang.name === "css" || lang.name === "web") return;
     await execute(code, lang.id);
   }, [room, code, execute, rebuildPreview]);
 
@@ -278,7 +334,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
   const handleReset = useCallback(() => {
     if (!room || editorReadOnly) return;
-    const defaultCode = getLanguage(room.language)?.defaultCode ?? "";
+    // Multi-file modes reset the visible file to its own default.
+    const defaultCode =
+      room.language === "web"
+        ? (roomFiles.find((f) => f.name === activeFile)?.defaultCode ?? "")
+        : (getLanguage(room.language)?.defaultCode ?? "");
     if (!defaultCode || code === defaultCode) return;
     // Shared document: resetting replaces the code for everyone in the
     // room (via the editor's Yjs-synced setCode), so confirm first.
@@ -290,7 +350,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       return;
     }
     editorRef.current?.setCode(defaultCode);
-  }, [room, code, editorReadOnly]);
+  }, [room, code, editorReadOnly, roomFiles, activeFile]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -551,6 +611,9 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 isReadOnly={editorReadOnly}
                 userName={userName}
                 userColor={userColor}
+                files={roomFiles}
+                activeFile={activeFile}
+                onActiveFileChange={handleActiveFileChange}
                 onCodeChange={handleCodeChange}
                 onPresenceChange={handlePresenceChange}
               />

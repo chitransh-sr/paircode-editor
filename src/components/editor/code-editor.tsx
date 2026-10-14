@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
+import { useState, useRef, useEffect, useCallback, useImperativeHandle, useMemo, forwardRef } from "react";
 import Editor, { loader } from "@monaco-editor/react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 // y-monaco's MonacoBinding would sync text and render cursors, but its deep
 // import path ('monaco-editor/esm/.../editor.api.js') doesn't resolve under
-// Turbopack. Instead, we implement the same logic directly:
-//  1. Text sync via doc.on("update") + monacoModel.onDidChangeContent()
-//  2. Cursor tracking via Y.createRelativePosition → awareness
+// Turbopack. Instead, we implement the same logic directly, generalized to
+// one Monaco model + Y.Text per file (multi-file modes like Web):
+//  1. Text sync via doc.on("update") + per-model onDidChangeContent()
+//  2. Cursor tracking via Y.createRelativePosition → awareness (active file)
 //  3. Remote cursor rendering via monaco editor deltaDecorations()
 // NOTE: `monaco-editor` is imported as a type only. A static runtime import
 // pulls the entire ~5MB editor into the client bundle (slow first load) and
@@ -17,9 +18,11 @@ import { WebsocketProvider } from "y-websocket";
 // (see `monacoInstance` below), pinned to the installed version over CDN.
 import type * as monaco from "monaco-editor";
 import { getLanguage } from "@/lib/execute/languages";
+import type { RoomFile } from "@/types/execution";
 import { getUserColor, getUserInitials } from "@/lib/presence/colors";
 import { getWsUrl } from "@/lib/yjs/ws-client";
 import type { UserPresence } from "@/types/presence";
+import { cn } from "@/lib/utils/cn";
 
 // Pin the loader to the installed monaco-editor version over CDN so the
 // <Editor> mount doesn't fetch an unpinned (and CSP-blocked) `latest`.
@@ -51,14 +54,22 @@ interface CodeEditorProps {
   isReadOnly?: boolean;
   userName?: string;
   userColor?: string;
-  onCodeChange?: (code: string) => void;
+  /** Files for multi-file modes (Web: index.html + styles.css). */
+  files?: RoomFile[];
+  /** Name of the visible file. */
+  activeFile?: string;
+  onActiveFileChange?: (name: string) => void;
+  onCodeChange?: (code: string, fileName?: string) => void;
   onPresenceChange?: (users: UserPresence[]) => void;
 }
 
 export interface CodeEditorHandle {
-  /** Replace the entire editor content (syncs Yjs + notifies parent). */
+  /** Replace the entire active file content (syncs Yjs + notifies parent). */
   setCode: (code: string) => void;
+  /** Current content of the active file. */
   getCode: () => string;
+  /** Current content of any file by name (for merged previews). */
+  getFileCode: (name: string) => string;
 }
 
 export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
@@ -69,6 +80,9 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
       isReadOnly = false,
       userName = "",
       userColor = "",
+      files = [],
+      activeFile = "",
+      onActiveFileChange,
       onCodeChange,
       onPresenceChange,
     }: CodeEditorProps,
@@ -83,6 +97,186 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
     const cursorDebounceRef = useRef<NodeJS.Timeout | null>(null);
     const decorationIdsRef = useRef<string[] | null>(null);
     const [activeUsers, setActiveUsers] = useState<UserPresence[]>([]);
+    // Multi-file state: one Monaco model + one Y.Text per file.
+    const modelsRef = useRef(new Map<string, monaco.editor.ITextModel>());
+    const yTextsRef = useRef(new Map<string, Y.Text>());
+    const ownedModelsRef = useRef(new Set<string>());
+    const bindDisposersRef = useRef(new Map<string, () => void>());
+    const activeFileRef = useRef<string>("");
+
+    // Effective file list (single-file modes synthesize one entry) and the
+    // resolved visible file. Memoized so binding effects don't churn.
+    const effectiveFiles = useMemo<RoomFile[]>(() => {
+      if (files.length) return files;
+      const meta = getLanguage(language);
+      if (!meta) return [];
+      return [
+        {
+          name: `main.${meta.monacoLanguage}`,
+          monacoLanguage: meta.monacoLanguage,
+          defaultCode: meta.defaultCode ?? "",
+        },
+      ];
+    }, [files, language]);
+    const visibleActive =
+      effectiveFiles.some((f) => f.name === activeFile)
+        ? activeFile
+        : (effectiveFiles[0]?.name ?? "");
+
+    // Mirror the visible file for closures (set synchronously on switches).
+    useEffect(() => {
+      activeFileRef.current = visibleActive;
+    }, [visibleActive]);
+
+    // ─── Multi-file Yjs helpers (one Monaco model + Y.Text per file) ───
+
+    // Register the Monaco → Yjs listener for one file's model.
+    const bindFileModel = useCallback(
+      (file: RoomFile) => {
+        const doc = docRef.current;
+        const model = modelsRef.current.get(file.name);
+        const yText = yTextsRef.current.get(file.name);
+        if (!doc || !model || !yText || model.isDisposed()) return;
+        bindDisposersRef.current.get(file.name)?.();
+        const subscription = model.onDidChangeContent(() => {
+          if (isRemoteChangeRef.current) return;
+          const current = docRef.current;
+          const text = yTextsRef.current.get(file.name);
+          const liveModel = modelsRef.current.get(file.name);
+          if (!current || !text || !liveModel || liveModel.isDisposed()) return;
+          const newCode = liveModel.getValue();
+          if (newCode !== text.toString()) {
+            current.transact(() => {
+              text.delete(0, text.length);
+              text.insert(0, newCode);
+            }, "monaco");
+            if (file.name === activeFileRef.current) onCodeChange?.(newCode, file.name);
+          }
+        });
+        bindDisposersRef.current.set(file.name, () => subscription.dispose());
+      },
+      [onCodeChange]
+    );
+
+    // Ensure one Monaco model + Y.Text per file; adopt the auto-created
+    // model for the visible file; dispose removed files; show active.
+    const syncFileModels = useCallback(() => {
+      const editor = editorRef.current;
+      const monacoInstance = monacoRef.current;
+      const doc = docRef.current;
+      if (!editor || !monacoInstance || !doc) return;
+      const wanted = new Set(effectiveFiles.map((f) => f.name));
+      for (const [name, model] of modelsRef.current) {
+        if (!wanted.has(name)) {
+          bindDisposersRef.current.get(name)?.();
+          bindDisposersRef.current.delete(name);
+          if (ownedModelsRef.current.has(name)) {
+            if (!model.isDisposed()) model.dispose();
+            ownedModelsRef.current.delete(name);
+          }
+          modelsRef.current.delete(name);
+          yTextsRef.current.delete(name);
+        }
+      }
+      // First bind: adopt the auto-created model for the visible file.
+      const autoModel = editor.getModel();
+      if (autoModel && ![...modelsRef.current.values()].includes(autoModel)) {
+        modelsRef.current.set(activeFileRef.current, autoModel);
+      }
+      for (const file of effectiveFiles) {
+        let yText = yTextsRef.current.get(file.name);
+        if (!yText) {
+          yText = doc.getText(`file:${file.name}`);
+          yTextsRef.current.set(file.name, yText);
+        }
+        let model = modelsRef.current.get(file.name);
+        if (!model || model.isDisposed()) {
+          model = monacoInstance.editor.createModel(
+            yText.toString() || file.defaultCode,
+            file.monacoLanguage
+          );
+          ownedModelsRef.current.add(file.name);
+          modelsRef.current.set(file.name, model);
+        } else {
+          monacoInstance.editor.setModelLanguage(model, file.monacoLanguage);
+        }
+        bindFileModel(file);
+      }
+      const activeModel = modelsRef.current.get(activeFileRef.current);
+      if (activeModel && !activeModel.isDisposed() && editor.getModel() !== activeModel) {
+        editor.setModel(activeModel);
+      }
+    }, [effectiveFiles, bindFileModel]);
+
+    // Seed-or-adopt once the relay sync lands: fresh room → publish each
+    // default exactly once; existing room → adopt relay content.
+    const settleSharedDocs = useCallback(() => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      for (const file of effectiveFiles) {
+        const yText = yTextsRef.current.get(file.name);
+        if (!yText) continue;
+        const shared = yText.toString();
+        const model = modelsRef.current.get(file.name);
+        if (shared) {
+          if (model && !model.isDisposed() && shared !== model.getValue()) {
+            isRemoteChangeRef.current = true;
+            model.setValue(shared);
+            isRemoteChangeRef.current = false;
+            if (file.name === activeFileRef.current) onCodeChange?.(shared, file.name);
+          }
+        } else if (file.defaultCode) {
+          yText.insert(0, file.defaultCode);
+        }
+      }
+    }, [effectiveFiles, onCodeChange]);
+
+    // Yjs → Monaco router across all files (remote edits + sync merges).
+    // Only the visible file is reported — background files sync silently
+    // so Run/Preview keep the right code.
+    const handleDocUpdate = useCallback(
+      (_update: Uint8Array, origin: unknown) => {
+        if (origin === "monaco" || isRemoteChangeRef.current) return;
+        isRemoteChangeRef.current = true;
+        try {
+          for (const file of effectiveFiles) {
+            const yText = yTextsRef.current.get(file.name);
+            const model = modelsRef.current.get(file.name);
+            if (!yText || !model || model.isDisposed()) continue;
+            const newCode = yText.toString();
+            if (newCode !== model.getValue()) {
+              model.setValue(newCode);
+              if (file.name === activeFileRef.current) onCodeChange?.(newCode, file.name);
+            }
+          }
+        } finally {
+          isRemoteChangeRef.current = false;
+        }
+      },
+      [effectiveFiles, onCodeChange]
+    );
+
+    // Switch the visible file (tab click). Content follows via onCodeChange.
+    const switchToFile = useCallback(
+      (name: string) => {
+        const editor = editorRef.current;
+        const model = modelsRef.current.get(name);
+        if (!editor || !model || model.isDisposed()) return;
+        if (editor.getModel() !== model) {
+          const prev = editor.getModel();
+          if (prev && decorationIdsRef.current?.length) {
+            prev.deltaDecorations(decorationIdsRef.current, []);
+            decorationIdsRef.current = null;
+          }
+          editor.setModel(model);
+        }
+        activeFileRef.current = name;
+        awarenessRef.current?.setLocalStateField("file", name);
+        onCodeChange?.(model.getValue(), name);
+        onActiveFileChange?.(name);
+      },
+      [onActiveFileChange, onCodeChange]
+    );
 
     // Yjs binding to Monaco, using a shared WebsocketProvider so that
     // changes are broadcast to other collaborators in the same room.
@@ -95,43 +289,49 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
         doc: Y.Doc,
         provider: WebsocketProvider
       ) => {
-        const yText = doc.getText("monaco");
+        docRef.current = doc;
+        providerRef.current = provider;
         const awareness = provider.awareness;
         awarenessRef.current = awareness;
 
-        // Local user profile (for presence display)
+        // Local user profile (for presence display + same-file cursors)
         awareness.setLocalState({
           user: {
             id: `user-${Date.now()}`,
             name: userName || "Anonymous",
             color: localStorage.getItem("editor-user-color") || getUserColor(Math.floor(Math.random() * 12)),
           },
+          file: activeFileRef.current,
         });
 
         const monacoModel = editor.getModel();
 
-        /** Convert a Monaco position to a Yjs relative position. */
+        /** Convert a Monaco position to a Yjs relative position (active file). */
         const posToRelative = (pos: monaco.IPosition): Y.RelativePosition | null => {
-          if (!pos || !monacoModel) return null;
-          const index = monacoModel.getOffsetAt(pos);
+          const yText = yTextsRef.current.get(activeFileRef.current);
+          const model = editor.getModel();
+          if (!pos || !model || !yText) return null;
+          const index = model.getOffsetAt(pos);
           return Y.createRelativePositionFromTypeIndex(yText, index, 0);
         };
 
         /** Convert a Yjs absolute position to a Monaco position. */
         const absToMonaco = (abs: Y.AbsolutePosition | null): monaco.IPosition | null => {
-          if (!abs || !monacoModel) return null;
-          const offset = Math.min(abs.index, monacoModel.getValueLength());
-          return monacoModel.getPositionAt(offset);
+          const model = editor.getModel();
+          if (!abs || !model) return null;
+          const offset = Math.min(abs.index, model.getValueLength());
+          return model.getPositionAt(offset);
         };
 
         // Awareness change handler — updates user list and renders remote cursors
         const handleAwarenessChange = () => {
-          if (!awarenessRef.current || !monacoModel) return;
+          if (!awarenessRef.current) return;
 
           const states = awarenessRef.current.getStates() as Map<
             number,
             {
               user: { id: string; name: string; color: string };
+              file?: string;
               selection?: {
                 anchor: Y.RelativePosition;
                 head: Y.RelativePosition;
@@ -146,6 +346,8 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
           states.forEach((state, clientId) => {
             // Exclude the local client — parent adds it via currentUser.
             if (clientId === awarenessRef.current?.clientID || !state?.user) return;
+            // Cursors only make sense on the same file.
+            const sameFile = !state.file || state.file === activeFileRef.current;
 
             // Build CSS for per-user cursor colors
             if (state.user.color) {
@@ -162,7 +364,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
             }
 
             // Render remote selection/cursor as Monaco decorations
-            if (state.selection?.anchor && state.selection?.head) {
+            if (sameFile && state.selection?.anchor && state.selection?.head) {
               try {
                 const anchorAbs = Y.createAbsolutePositionFromRelativePosition(
                   state.selection.anchor, doc
@@ -195,7 +397,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
             }
 
             const cursorPos = absToMonaco(
-              state.selection?.head
+              sameFile && state.selection?.head
                 ? Y.createAbsolutePositionFromRelativePosition(state.selection.head, doc)
                 : null
             );
@@ -212,17 +414,20 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
             users.push(user);
           });
 
-          // Apply remote cursor decorations to the Monaco editor
-          if (decorations.length > 0) {
-            const ids = monacoModel.deltaDecorations(
-              decorationIdsRef.current || [],
-              decorations
-            );
-            decorationIdsRef.current = ids;
-          } else if (decorationIdsRef.current && decorationIdsRef.current.length > 0) {
-            // All remote users disconnected — clear decorations
-            monacoModel.deltaDecorations(decorationIdsRef.current, []);
-            decorationIdsRef.current = null;
+          // Apply remote cursor decorations to the visible editor model
+          const activeModel = editor.getModel();
+          if (activeModel && !activeModel.isDisposed()) {
+            if (decorations.length > 0) {
+              const ids = activeModel.deltaDecorations(
+                decorationIdsRef.current || [],
+                decorations
+              );
+              decorationIdsRef.current = ids;
+            } else if (decorationIdsRef.current && decorationIdsRef.current.length > 0) {
+              // All remote users disconnected — clear decorations
+              activeModel.deltaDecorations(decorationIdsRef.current, []);
+              decorationIdsRef.current = null;
+            }
           }
 
           // Inject per-user cursor CSS
@@ -241,41 +446,17 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
         };
 
         if (monacoModel) {
-          monacoInstance.editor.setModelLanguage(monacoModel, language || "javascript");
+          // Multi-file bind: one Monaco model + Y.Text per file (the
+          // auto-created model is adopted for the visible file).
+          // Per-file content listeners register inside syncFileModels.
+          syncFileModels();
 
-          // Default-code guarantee: the Monaco view is created with the
-          // language default already (defaultValue), so report it now —
-          // every entrant immediately sees starter code, for every language.
-          // (Shared-doc seeding happens after the relay sync lands — see
-          // settleSharedDoc below. Seeding blindly here races sync and
-          // duplicates/corrupts content on joins.)
-          onCodeChange?.(editor.getValue());
+          // Single doc-level update router for Yjs → Monaco sync.
+          doc.on("update", handleDocUpdate);
 
-          // Bidirectional text sync: Yjs → Monaco
-          doc.on("update", (_update: Uint8Array, origin: unknown) => {
-            if (origin === "monaco" || isRemoteChangeRef.current) return;
-
-            isRemoteChangeRef.current = true;
-            const newCode = yText.toString();
-            if (newCode !== editor.getValue()) {
-              editor.setValue(newCode);
-              onCodeChange?.(newCode);
-            }
-            isRemoteChangeRef.current = false;
-          });
-
-          // Monaco → Yjs
-          monacoModel.onDidChangeContent(() => {
-            if (isRemoteChangeRef.current) return;
-            const newCode = editor.getValue();
-            if (newCode !== yText.toString()) {
-              doc.transact(() => {
-                yText.delete(0, yText.length);
-                yText.insert(0, newCode);
-              }, "monaco");
-              onCodeChange?.(newCode);
-            }
-          });
+          // Report the visible file (Monaco already shows its default).
+          const activeModel = editor.getModel();
+          if (activeModel) onCodeChange?.(activeModel.getValue(), activeFileRef.current);
 
           // Local cursor tracking → awareness (for remote cursor rendering)
           editor.onDidChangeCursorPosition(() => {
@@ -312,43 +493,17 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
           });
         }
 
-        // Seed-or-adopt the shared doc once the relay sync lands. The Monaco
-        // view already shows the language default, so entrants always see
-        // starter code; the doc itself is seeded only when still empty
-        // after sync (fresh room), otherwise relay content wins (adopt).
-        let settled = false;
-        const settleSharedDoc = () => {
-          if (settled) return;
-          settled = true;
-          const shared = yText.toString();
-          if (shared) {
-            // Existing room: relay content wins — adopt it.
-            if (shared !== editor.getValue()) {
-              isRemoteChangeRef.current = true;
-              editor.setValue(shared);
-              isRemoteChangeRef.current = false;
-              onCodeChange?.(shared);
-            }
-          } else {
-            const langDefault = getLanguage(language)?.defaultCode ?? "";
-            if (langDefault) {
-              // Fresh room: publish the default exactly once.
-              yText.insert(0, langDefault);
-            }
-          }
-        };
-
-        // Normal path: the first relay sync decides seed-vs-adopt.
+        // Seed-or-adopt once the relay sync lands (fresh room → publish
+        // each default once; existing room → adopt relay content).
         const onSync = (synced: boolean) => {
           if (synced) {
-            settleSharedDoc();
+            settleSharedDocs();
             clearTimeout(syncFallback);
           }
         };
         provider.on("sync", onSync);
-        // Fallback: relay unreachable (blocked ws / serverless) — still
-        // publish the local default so the doc is never empty.
-        const syncFallback = setTimeout(settleSharedDoc, 2500);
+        // Fallback: relay unreachable — still publish local defaults.
+        const syncFallback = setTimeout(() => settleSharedDocs(), 2500);
 
         // Listen for awareness changes (other users join/leave/update)
         awareness.on("change", handleAwarenessChange);
@@ -360,13 +515,21 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
           if (cursorDebounceRef.current) clearTimeout(cursorDebounceRef.current);
           clearTimeout(syncFallback);
           provider.off("sync", onSync);
+          for (const dispose of bindDisposersRef.current.values()) dispose();
+          bindDisposersRef.current.clear();
+          for (const name of ownedModelsRef.current) {
+            modelsRef.current.get(name)?.dispose();
+          }
+          ownedModelsRef.current.clear();
+          modelsRef.current.clear();
+          yTextsRef.current.clear();
           awareness.off("change", handleAwarenessChange);
           awareness.destroy();
           provider.destroy();
           doc.destroy();
         };
       },
-      [language, userName, onCodeChange, onPresenceChange]
+      [userName, onCodeChange, onPresenceChange, syncFileModels, handleDocUpdate, settleSharedDocs]
     );
 
     // Handle editor mount
@@ -457,42 +620,49 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
     // Track previous language to detect changes
     const prevLangRef = useRef<string>(language);
 
-    // Handle language change — update syntax highlighting AND reset code
-    // to the new language's default. Since language is a room-level setting,
-    // switching languages always replaces the shared document content so all
-    // collaborators see the new starter code (matching the original key-change
-    // remount behavior).
+    // Handle language change — swap the file set and reset every file to
+    // its new default (shared doc + views), so all collaborators see the
+    // new starter code. Shows the first file afterwards.
     useEffect(() => {
-      if (!editorRef.current || !monacoRef.current) return;
+      const editor = editorRef.current;
+      const monacoInstance = monacoRef.current;
+      const doc = docRef.current;
+      if (!editor || !monacoInstance || !doc) return;
+      if (prevLangRef.current === language) return;
 
-      const model = editorRef.current.getModel();
-      if (!model) return;
+      // Sync models to the new file set (adds/removes/relanguages).
+      syncFileModels();
 
-      // Always update the syntax highlighting language
-      const monacoLang = getLanguage(language)?.monacoLanguage || "javascript";
-      monacoRef.current.editor.setModelLanguage(model, monacoLang);
-
-      // Reset code to the new language's default on language switch
-      const prevLang = prevLangRef.current;
-      if (prevLang !== language) {
-        const nextDefault = getLanguage(language)?.defaultCode ?? "";
-        isRemoteChangeRef.current = true;
-        editorRef.current.setValue(nextDefault);
-        isRemoteChangeRef.current = false;
-
-        const doc = docRef.current;
-        if (doc) {
-          const yText = doc.getText("monaco");
+      isRemoteChangeRef.current = true;
+      try {
+        for (const file of effectiveFiles) {
+          const yText = doc.getText(`file:${file.name}`);
+          yTextsRef.current.set(file.name, yText);
           doc.transact(() => {
             yText.delete(0, yText.length);
-            yText.insert(0, nextDefault);
+            yText.insert(0, file.defaultCode);
           }, "language-switch");
+          const model = modelsRef.current.get(file.name);
+          if (model && !model.isDisposed()) {
+            monacoInstance.editor.setModelLanguage(model, file.monacoLanguage);
+            model.setValue(file.defaultCode);
+          }
         }
-
-        onCodeChange?.(nextDefault);
-        prevLangRef.current = language;
+      } finally {
+        isRemoteChangeRef.current = false;
       }
-    }, [language, onCodeChange]);
+
+      const first = effectiveFiles[0]?.name ?? "";
+      const firstModel = modelsRef.current.get(first);
+      if (firstModel && !firstModel.isDisposed()) {
+        if (editor.getModel() !== firstModel) editor.setModel(firstModel);
+        activeFileRef.current = first;
+        awarenessRef.current?.setLocalStateField("file", first);
+        onCodeChange?.(firstModel.getValue(), first);
+        onActiveFileChange?.(first);
+      }
+      prevLangRef.current = language;
+    }, [language, effectiveFiles, syncFileModels, onCodeChange, onActiveFileChange]);
 
     // Apply read-only toggles live (settings drawer can change this anytime)
     useEffect(() => {
@@ -513,27 +683,36 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
       }
     }, [userName]);
 
-    // Expose imperative helpers (e.g. applying formatted code from the toolbar)
+    // Expose imperative helpers (e.g. applying formatted code from the toolbar).
+    // setCode/getCode target the visible file; getFileCode reads any file.
     useImperativeHandle(
       ref,
       () => ({
         setCode: (newCode: string) => {
-          const editor = editorRef.current;
-          if (!editor) return;
-          isRemoteChangeRef.current = true;
-          editor.setValue(newCode);
-          isRemoteChangeRef.current = false;
+          const active = activeFileRef.current;
+          const model = active ? modelsRef.current.get(active) : undefined;
+          const yText = active ? yTextsRef.current.get(active) : undefined;
           const doc = docRef.current;
-          if (doc) {
-            const yText = doc.getText("monaco");
-            doc.transact(() => {
-              yText.delete(0, yText.length);
-              yText.insert(0, newCode);
-            }, "external");
-          }
-          onCodeChange?.(newCode);
+          if (!model || model.isDisposed() || !yText || !doc) return;
+          isRemoteChangeRef.current = true;
+          model.setValue(newCode);
+          isRemoteChangeRef.current = false;
+          doc.transact(() => {
+            yText.delete(0, yText.length);
+            yText.insert(0, newCode);
+          }, "external");
+          onCodeChange?.(newCode, activeFileRef.current);
         },
-        getCode: () => editorRef.current?.getValue() ?? "",
+        getCode: () => {
+          const active = activeFileRef.current;
+          const model = active ? modelsRef.current.get(active) : undefined;
+          return model && !model.isDisposed() ? model.getValue() : "";
+        },
+        getFileCode: (name: string) => {
+          const model = modelsRef.current.get(name);
+          if (model && !model.isDisposed()) return model.getValue();
+          return yTextsRef.current.get(name)?.toString() ?? "";
+        },
       }),
       [onCodeChange, ref]
     );
@@ -550,8 +729,49 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
       return themeMap[themeValue] || "vs-dark";
     };
 
+    const tabActive =
+      effectiveFiles.some((f) => f.name === activeFile) && activeFile
+        ? activeFile
+        : (effectiveFiles[0]?.name ?? "");
+    const tabDefault =
+      effectiveFiles.find((f) => f.name === tabActive) ?? effectiveFiles[0];
+
     return (
-      <div className="relative h-full w-full">
+      <div className="relative h-full w-full flex flex-col">
+        {/* File tabs (multi-file modes like Web) */}
+        {effectiveFiles.length > 1 && (
+          <div className="flex items-center gap-1 px-3 pt-2 bg-card overflow-x-auto shrink-0" role="tablist" aria-label="Files">
+            {effectiveFiles.map((f) => {
+              const isActive = f.name === tabActive;
+              return (
+                <button
+                  key={f.name}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => switchToFile(f.name)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                    isActive
+                      ? "text-foreground border-accent bg-muted/40"
+                      : "text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/30"
+                  )}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{
+                      backgroundColor: f.name.endsWith(".css")
+                        ? "#38bdf8"
+                        : f.name.endsWith(".html")
+                          ? "#f97316"
+                          : "#22c55e",
+                    }}
+                  />
+                  {f.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {/* Remote cursors overlay */}
         {activeUsers.length > 0 && (
           <div className="absolute bottom-12 left-3 z-20 flex items-center gap-2">
@@ -577,24 +797,23 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
           </div>
         )}
 
-        <Editor
-          height="100%"
-          defaultLanguage={getLanguage(language)?.monacoLanguage || "javascript"}
-          defaultValue={
-            getLanguage(language)?.defaultCode ||
-            "// Start coding here..."
-          }
-          theme={getMonacoTheme(theme)}
-          onMount={handleEditorMount}
-          loading={
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
-            </div>
-          }
-          onChange={(value) => {
-            onCodeChange?.(value || "");
-          }}
-        />
+        <div className="flex-1 min-h-0">
+          <Editor
+            height="100%"
+            defaultLanguage={tabDefault?.monacoLanguage || "javascript"}
+            defaultValue={
+              tabDefault?.defaultCode ||
+              "// Start coding here..."
+            }
+            theme={getMonacoTheme(theme)}
+            onMount={handleEditorMount}
+            loading={
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+              </div>
+            }
+          />
+        </div>
       </div>
     );
   }

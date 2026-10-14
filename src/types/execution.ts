@@ -18,5 +18,14 @@ export interface LanguageMeta {
   monacoLanguage: string;
   defaultCode: string;
   /** Live-preview strategy for the Preview tab (absent = not previewable). */
-  preview?: "html" | "css" | "script" | "react";
+  preview?: "html" | "css" | "script" | "react" | "web";
+  /** Multi-file definitions (e.g. Web mode: index.html + styles.css). */
+  files?: RoomFile[];
+}
+
+/** A single editable file inside a (possibly multi-file) language mode. */
+export interface RoomFile {
+  name: string;
+  monacoLanguage: string;
+  defaultCode: string;
 }

@@ -118,6 +118,32 @@ ${escapeScript(js)}
 </html>`;
 }
 
+function webPage(html: string, css: string): string {
+  const styleTag = `\n    <style>\n${escapeStyle(css)}\n    </style>`;
+  if (/<\/head\s*>/i.test(html)) {
+    return html.replace(/<\/head\s*>/i, `${styleTag}\n  </head>`);
+  }
+  if (/<html[^>]*>/i.test(html)) {
+    return html.replace(/<html[^>]*>/i, (m) => `${m}\n  <head>${styleTag}\n  </head>`);
+  }
+  return `<!DOCTYPE html>
+<html>
+  <head>${styleTag}
+  </head>
+  <body>
+${html}
+  </body>
+</html>`;
+}
+
+/** Merged HTML+CSS document for Web (multi-file) rooms. */
+export function buildWebPreviewHtml(htmlCode: string, cssCode: string): string {
+  if (!htmlCode.trim() && !cssCode.trim()) {
+    return placeholderPage("Start typing to see a live preview…");
+  }
+  return webPage(htmlCode, cssCode);
+}
+
 async function toPlainJs(
   code: string,
   transforms: ("typescript" | "jsx" | "imports")[],
@@ -252,8 +278,14 @@ ${escapeScript(compiled)}
 /** Build a complete sandboxed preview document for the given strategy + code. */
 export async function buildPreviewHtml(
   strategy: PreviewStrategy,
-  code: string
+  code: string | { html: string; css: string }
 ): Promise<string> {
+  if (typeof code !== "string") {
+    if (!code.html.trim() && !code.css.trim()) {
+      return placeholderPage("Start typing to see a live preview…");
+    }
+    return webPage(code.html, code.css);
+  }
   if (!code.trim()) {
     return placeholderPage("Start typing to see a live preview…");
   }
@@ -266,5 +298,7 @@ export async function buildPreviewHtml(
       return scriptPage(code);
     case "react":
       return reactPage(code);
+    case "web":
+      return webPage(code, "");
   }
 }

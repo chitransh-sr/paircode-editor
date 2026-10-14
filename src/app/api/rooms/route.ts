@@ -4,7 +4,7 @@ import { executeRateLimiter } from "@/lib/security/rate-limit";
 
 /** Validate language value against supported set. */
 function sanitizeLanguage(lang: unknown): string {
-  const valid = ["javascript", "typescript", "jsx", "react", "html", "css", "python", "go", "rust", "c", "cpp", "java", "ruby", "php"];
+  const valid = ["javascript", "typescript", "jsx", "react", "web", "html", "css", "python", "go", "rust", "c", "cpp", "java", "ruby", "php"];
   if (typeof lang === "string" && valid.includes(lang)) return lang;
   return "javascript";
 }
