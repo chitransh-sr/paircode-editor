@@ -82,19 +82,21 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
   const closeModals = () => {
     setShowCreateModal(false);
     setShowJoinModal(false);
+    setRequiresPassword(false);
+    setJoinPassword("");
     setError("");
     setJoinError("");
   };
 
   // Escape closes any open modal
   useEffect(() => {
-    if (!showCreateModal && !showJoinModal) return;
+    if (!showCreateModal && !showJoinModal && !requiresPassword) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeModals();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showCreateModal, showJoinModal]);
+  }, [showCreateModal, showJoinModal, requiresPassword]);
 
   // After first mount, read recent rooms from localStorage and enable
   // rendering. The first client render still shows the empty list (matching
@@ -167,6 +169,9 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       if (response.ok) {
         const room: Room = await response.json();
         if (room.is_private) {
+          // Switch from join form to password step — unmount join modal
+          // so it cannot cover the password prompt.
+          setShowJoinModal(false);
           setRequiresPassword(true);
           setJoinError("");
           return; // Show password prompt instead of joining
@@ -433,6 +438,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     placeholder="Enter room password"
                     className="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
                     autoComplete="new-password"
+                    autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -452,6 +458,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                       setRequiresPassword(false);
                       setJoinError("");
                       setJoinPassword("");
+                      setShowJoinModal(true);
                     }}
                     className="flex-1 px-4 py-2 bg-muted text-foreground hover:bg-muted/80 rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   >
@@ -476,8 +483,8 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
         </div>
       )}
 
-      {/* Join Room Modal */}
-      {showJoinModal && (
+      {/* Join Room Modal — hidden while password step is active */}
+      {showJoinModal && !requiresPassword && (
         <div>
           <div
             className="fixed inset-0 bg-black/50 z-50"
