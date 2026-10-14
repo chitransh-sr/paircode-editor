@@ -106,9 +106,16 @@ export function RoomHeader({
         <span className="text-xl font-bold text-accent sm:hidden">PC</span>
         <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
           <span className="hidden sm:inline">Room:</span>
-          <code className="bg-background px-2 py-0.5 rounded text-xs border border-border">
+          <button
+            onClick={copyLink}
+            title={`Copy full room link:\n${room.id}`}
+            className="bg-background px-2 py-0.5 rounded text-xs border border-border font-mono hover:border-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-pointer"
+          >
             {room.id.slice(0, 8)}
-          </code>
+          </button>
+          {room.is_private && (
+            <Lock className="w-3 h-3 text-accent shrink-0" aria-label="Private room" />
+          )}
           {canManage && room.is_private && (
             <div className="relative">
               <button

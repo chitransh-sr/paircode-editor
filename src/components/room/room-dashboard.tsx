@@ -192,12 +192,25 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       return;
     }
     // Server is the source of truth for privacy (localStorage entries can
-    // be stale). If the server says private → prompt. Only join directly
-    // when the server confirms public.
+    // be stale). Check-only mode (?create=0) never materializes rooms, so
+    // a truncated/wrong ID returns 404 instead of silently creating a new
+    // empty public room (which looked like a password bypass).
     try {
-      const response = await fetch(`/api/rooms/${entry.id}`, {
+      const response = await fetch(`/api/rooms/${entry.id}?create=0`, {
         headers: { Accept: "application/json" },
       });
+      if (response.status === 404) {
+        // Stale entry (room expired or never existed on this server) —
+        // drop it from history instead of landing in a wrong empty room.
+        const pruned = readRecentRooms().filter((r) => r.id !== entry.id);
+        try {
+          localStorage.setItem("recent-rooms", JSON.stringify(pruned));
+        } catch {
+          // localStorage unavailable — state update below still applies
+        }
+        setRecentRooms(pruned);
+        return;
+      }
       if (response.ok) {
         const serverRoom: Room = await response.json();
         if (serverRoom.is_private) {
@@ -229,11 +242,16 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       return;
     }
 
-    // Check if room is private
+    // Check-only mode (?create=0): a truncated/wrong ID returns 404
+    // instead of silently materializing a new empty public room.
     try {
-      const response = await fetch(`/api/rooms/${roomId}`, {
+      const response = await fetch(`/api/rooms/${roomId}?create=0`, {
         headers: { Accept: "application/json" },
       });
+      if (response.status === 404) {
+        setJoinError("Room not found. Check the link — copy the full URL from the interviewer.");
+        return;
+      }
       if (response.ok) {
         const room: Room = await response.json();
         if (room.is_private) {
@@ -682,7 +700,15 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
 
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(`/room/${createdRoom.id}`);
+                    // Copy the FULL absolute link (with origin) — a relative
+                    // path or truncated ID would land the candidate in the
+                    // wrong room (the server materializes unknown IDs as new
+                    // public rooms with no password).
+                    const fullUrl =
+                      typeof window !== "undefined"
+                        ? `${window.location.origin}/room/${createdRoom.id}`
+                        : `/room/${createdRoom.id}`;
+                    navigator.clipboard.writeText(fullUrl);
                     setCreatedRoomPassword(null);
                     setCreatedRoom(null);
                   }}

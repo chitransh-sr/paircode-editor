@@ -1,4 +1,4 @@
-import { getRoomRecord, updateRoomRecord, deleteRoomRecord, verifyOwnerToken } from "@/lib/rooms/store";
+import { getRoomRecord, getRoomRecordSecure, updateRoomRecord, deleteRoomRecord, verifyOwnerToken } from "@/lib/rooms/store";
 import { withSecurityHeaders } from "@/lib/security/headers";
 import { executeRateLimiter } from "@/lib/security/rate-limit";
 import type { UpdateRoomInput } from "@/types/room";
@@ -33,6 +33,17 @@ export async function GET(
   if (!isValidRoomId(id)) {
     return withSecurityHeaders(
       Response.json({ error: "Invalid room ID format" }, { status: 400 })
+    );
+  }
+  // ?create=0 is a check-only mode: return 404 for unknown rooms instead
+  // of materializing a new public room. Join flows use this to detect
+  // truncated/wrong links — without it, a typo'd private-room ID would
+  // silently land the candidate in a brand-new EMPTY public room with no
+  // password prompt (looks like a password bypass, but it's the wrong room).
+  const url = new URL(_request.url);
+  if (url.searchParams.get("create") === "0" && !getRoomRecordSecure(id)) {
+    return withSecurityHeaders(
+      Response.json({ error: "Room not found. Check the link." }, { status: 404 })
     );
   }
   return withSecurityHeaders(Response.json(getRoomRecord(id)));
