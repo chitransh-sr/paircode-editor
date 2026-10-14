@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Lock, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { verifyRoomPassword } from "@/hooks/use-room";
+import { verifyRoomPassword, isRoomOwner } from "@/hooks/use-room";
 import type { Room } from "@/types/room";
 
 interface PasswordGateProps {
@@ -156,5 +156,10 @@ export function PasswordGate({ room, onUnlocked }: PasswordGateProps) {
 /** Check if a room requires password and if the user has been verified. */
 export function checkRoomAccess(roomId: string, room: Room | null): boolean {
   if (!room || !room.is_private) return true;
+  // Owner (interviewer) always has access — they created the room and
+  // hold the owner token in sessionStorage. Without this, the owner
+  // would be stuck behind their own password gate (the verified flag
+  // is never set for the creator, only the password is stored).
+  if (isRoomOwner(roomId)) return true;
   return sessionStorage.getItem(`room-verified-${roomId}`) === "true";
 }
