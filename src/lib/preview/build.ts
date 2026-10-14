@@ -109,9 +109,13 @@ ${escapeScript(js)}
 </html>`;
 }
 
-async function toPlainJs(code: string, transforms: ("typescript" | "jsx" | "imports")[]): Promise<string> {
+async function toPlainJs(
+  code: string,
+  transforms: ("typescript" | "jsx" | "imports")[],
+  production = false
+): Promise<string> {
   const { transform } = await import("sucrase");
-  return transform(code, { transforms }).code;
+  return transform(code, { transforms, production }).code;
 }
 
 /** Strip TypeScript types so TS snippets can run in the script preview. */
@@ -140,12 +144,41 @@ async function reactPage(code: string): Promise<string> {
     const prelude =
       (hasReactImport(code) ? "" : 'import React from "react";\n') +
       (hasCreateRootImport(code) ? "" : 'import { createRoot } from "react-dom/client";\n');
-    compiled = await toPlainJs(prelude + code, ["jsx"]);
+    // Normalize exports so every shape renders: strip named-export keywords
+    // and capture `export default` into a variable we can render.
+    // (Import/export statements are only valid at module top level, so the
+    // compiled output must NOT be wrapped in a try{} block below.)
+    let source = prelude + code;
+    // `react-dom/server` is a Node-only build — importing it in the browser
+    // preview either 404s on esm.sh or throws at evaluation, which aborts
+    // the whole module before our createRoot render runs (blank white
+    // preview). Strip it and stub renderToString; the visual preview renders
+    // via createRoot, so server rendering is unnecessary here.
+    const needsServerStub = /from\s+["']react-dom\/server[^"']*["']/.test(source);
+    source = source.replace(
+      /^\s*import\s+[^;]*?\bfrom\s+["']react-dom\/server[^"']*["']\s*;?\s*$/gm,
+      ""
+    );
+    source = source.replace(/export\s+default\s+/g, "const __DefaultExport = ");
+    source = source.replace(
+      /^(\s*)export\s+(?=(async\s+function|function|const|let|var|class))/gm,
+      "$1"
+    );
+    source = source.replace(/^\s*export\s*\{[^}]*\}\s*;?\s*$/gm, "");
+    source = source.replace(/^\s*export\s*\*[^;]*;?\s*$/gm, "");
+    if (needsServerStub) {
+      source += `\nfunction renderToString() { return ""; }\n`;
+    }
+    compiled = await toPlainJs(source, ["jsx"], true);
   } catch (error) {
     const message = error instanceof Error ? error.message : "JSX compile failed";
     return errorPage(`JSX compile failed: ${message.split("\n")[0]}`);
   }
 
+  // NOTE: `compiled` contains top-level `import` statements, which are a
+  // SyntaxError anywhere but the module top level. It must stay outside any
+  // try{} / IIFE block — previously it was inside `try {`, so the whole
+  // module failed to parse and the preview stayed blank white with no error.
   return `<!DOCTYPE html>
 <html>
   <head>
@@ -173,23 +206,21 @@ async function reactPage(code: string): Promise<string> {
     <div id="__err"></div>
     <script type="module">
       function showError(m) {
-        document.getElementById("__err").textContent = "Error: " + m;
+        var el = document.getElementById("__err");
+        if (el) el.textContent = "Error: " + m;
       }
-      window.addEventListener("error", function (e) { showError(e.message || e.error); });
-      window.addEventListener("unhandledrejection", function (e) { showError(e.reason); });
-      try {
+      window.addEventListener("error", function (e) { showError(e.message || (e.error && e.error.message) || e.error); });
+      window.addEventListener("unhandledrejection", function (e) { showError((e.reason && e.reason.message) || e.reason); });
 ${escapeScript(compiled)}
-        (function () {
-          try {
-            if (typeof App !== "undefined") {
-              createRoot(document.getElementById("root")).render(React.createElement(App));
-            } else {
-              showError("Define an App component to preview it.");
-            }
-          } catch (e) {
-            showError((e && e.message) || e);
-          }
-        })();
+      try {
+        var __Target = (typeof App !== "undefined")
+          ? App
+          : (typeof __DefaultExport !== "undefined" ? __DefaultExport : null);
+        if (__Target) {
+          createRoot(document.getElementById("root")).render(React.createElement(__Target));
+        } else {
+          showError("Define an App component (function App) or a default export to preview it.");
+        }
       } catch (e) {
         showError((e && e.message) || e);
       }

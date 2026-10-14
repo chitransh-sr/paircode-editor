@@ -69,6 +69,7 @@ export function SettingsDrawer({
             <LanguageSelect
               value={language}
               onChange={onLanguageChange}
+              disabled={isReadOnly}
             />
           </div>
 
@@ -77,6 +78,7 @@ export function SettingsDrawer({
             <ThemeToggle
               theme={theme}
               onChange={onThemeChange}
+              disabled={isReadOnly}
             />
           </div>
 

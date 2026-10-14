@@ -54,6 +54,17 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   // Stable user identity (useId is SSR-safe, unlike Date.now())
   const currentUserId = useId();
 
+  // Warm up the Yjs WebSocket server (the /api/yjs/start route starts it
+  // lazily on the server). This ensures availability before the editor
+  // component mounts and the WebsocketProvider tries to connect.
+  useEffect(() => {
+    if (roomId) {
+      fetch(`/api/yjs/start`).catch(() => {
+        /* server-less: non-blocking */
+      });
+    }
+  }, [roomId]);
+
   // Derived error: combine hook error and roomId validation
   const error = roomError?.message || (!roomId && !roomError && !isLoading ? "Room ID not provided" : null);
 
@@ -155,6 +166,36 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     }, 700);
     return () => clearTimeout(timer);
   }, [previewOpen, previewSupported, rebuildPreview]);
+
+  const handleTogglePreview = useCallback(() => {
+    // Build immediately when opening so the pane never sits blank white.
+    // (The debounced effect above handles subsequent typing.)
+    if (!previewOpen) {
+      setPreviewOpen(true);
+      rebuildPreview();
+    } else {
+      setPreviewOpen(false);
+    }
+  }, [previewOpen, rebuildPreview]);
+
+  const handleRun = useCallback(async () => {
+    if (!room || !code) return;
+    const lang = getLanguage(room.language);
+    if (!lang) return;
+    // Render-only languages (HTML/CSS) open the Preview pane
+    if (lang.name === "html" || lang.name === "css") {
+      setPreviewOpen(true);
+      await rebuildPreview();
+      return;
+    }
+    await execute(code, lang.id);
+    // Keep the visual preview in sync for previewable languages
+    // (JS / TS / React). Run still drives the console; preview drives pixels.
+    if (lang.preview) {
+      if (!previewOpen) setPreviewOpen(true);
+      await rebuildPreview();
+    }
+  }, [room, code, execute, previewOpen, rebuildPreview]);
 
   const canFormat = !!room && FORMATTABLE_LANGUAGES.has(room.language);
 
@@ -289,18 +330,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                     code={code}
                     isExecuting={isExecuting}
                     result={executionResult}
-                    onExecute={async () => {
-                      const lang = getLanguage(room.language);
-                      if (!lang) return;
-                      // Render-only languages (HTML/CSS) open the Preview pane
-                      if (lang.name === "html" || lang.name === "css") {
-                        setPreviewOpen(true);
-                        await rebuildPreview();
-                        return;
-                      }
-                      if (!code) return;
-                      await execute(code, lang.id);
-                    }}
+                    onExecute={handleRun}
                     disabled={room.is_read_only}
                   />
                 </div>
@@ -354,7 +384,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                   <span className="hidden sm:inline">Format</span>
                 </button>
                 <button
-                  onClick={() => setPreviewOpen((v) => !v)}
+                  onClick={handleTogglePreview}
                   disabled={!previewSupported}
                   aria-pressed={previewOpen}
                   className={cn(
@@ -395,10 +425,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
             </div>
 
             <div className="flex-1 overflow-hidden min-h-0">
-              {/* Remount on language switch so the snippet resets to the new
-                  language default instead of showing stale code. */}
               <CodeEditor
-                key={room.language}
                 ref={editorRef}
                 language={room.language}
                 theme={room.theme}

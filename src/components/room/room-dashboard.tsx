@@ -67,7 +67,11 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
   const [creating, setCreating] = useState(false);
 
   // Get recent rooms from localStorage (lazy init to avoid setState-in-effect)
-  const [recentRooms, setRecentRooms] = useState<RecentRoom[]>(readRecentRooms);
+  // IMPORTANT: initialize empty on first render so it matches the SSR output
+  // (localStorage is unavailable during SSR, so readRecentRooms returns []).
+  // Populate client-side after mount to avoid hydration mismatches.
+  const [recentRooms, setRecentRooms] = useState<RecentRoom[]>([]);
+  const [suppressRecent, setSuppressRecent] = useState(true);
 
   const closeModals = () => {
     setShowCreateModal(false);
@@ -86,6 +90,14 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
     return () => window.removeEventListener("keydown", onKey);
   }, [showCreateModal, showJoinModal]);
 
+  // After first mount, read recent rooms from localStorage and enable
+  // rendering. The first client render still shows the empty list (matching
+  // SSR), then this effect triggers a safe state update to populate it.
+  useEffect(() => {
+    setRecentRooms(readRecentRooms());
+    setSuppressRecent(false);
+  }, []);
+
   const handleCreateRoom = async () => {
     if (!roomName.trim()) {
       setError("Room name is required");
@@ -97,11 +109,12 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
     try {
       const room = await createRoom({ language: selectedLanguage });
 
-      // Store in localStorage (with the display name)
+      // Store in localStorage (with the display name), then update state.
       const entry: RecentRoom = { ...room, name: roomName.trim() };
-      const updatedRooms = [entry, ...readRecentRooms().filter((r) => r.id !== room.id)].slice(0, 10);
-      localStorage.setItem("recent-rooms", JSON.stringify(updatedRooms));
+      const stored = readRecentRooms().filter((r) => r.id !== room.id);
+      const updatedRooms = [entry, ...stored].slice(0, 10);
 
+      localStorage.setItem("recent-rooms", JSON.stringify(updatedRooms));
       setRecentRooms(updatedRooms);
       setRoomName("");
       setShowCreateModal(false);
@@ -174,8 +187,8 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
           </button>
         </div>
 
-        {/* Recent rooms */}
-        {recentRooms.length > 0 && (
+        {/* Recent rooms — suppressed until after first mount to avoid SSR/client mismatch */}
+        {!suppressRecent && recentRooms.length > 0 && (
           <div className="mb-20">
             <h2 className="text-lg font-semibold mb-3 text-foreground">Recent Rooms</h2>
             <div className="space-y-2">

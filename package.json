@@ -29,8 +29,10 @@
     "sucrase": "^3.35.1",
     "tailwind-merge": "^3.7.0",
     "uuid": "^14.0.3",
+    "ws": "^8.22.0",
     "y-monaco": "^0.1.6",
     "y-protocols": "^1.0.7",
+    "y-websocket": "^3.1.0",
     "yjs": "^13.6.33",
     "zustand": "^5.0.15"
   },
@@ -39,6 +41,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
     "tailwindcss": "^4",

@@ -226,6 +226,26 @@ async function executeJsx(
     execution_time: (Date.now() - startTime) / 1000,
   });
 
+  // The compiled file runs from a fresh /tmp dir, so bare
+  // `require("react")` / `require("react-dom/server")` cannot resolve by
+  // walking up to the project's node_modules (symlink + NODE_PATH are
+  // unreliable for package-export subpaths on some setups). Rewrite them
+  // to absolute paths resolved at build time — bulletproof regardless of
+  // cwd, symlink support, or NODE_PATH handling.
+  const reactPath = join(process.cwd(), "node_modules", "react", "index.js");
+  const reactDomPath = join(
+    process.cwd(),
+    "node_modules",
+    "react-dom",
+    "index.js"
+  );
+  const reactServerPath = join(
+    process.cwd(),
+    "node_modules",
+    "react-dom",
+    "server.node.js"
+  );
+
   // Transpile JSX (and ESM import syntax) to plain CommonJS
   let compiled: string;
   try {
@@ -236,6 +256,59 @@ async function executeJsx(
       !/from\s+["']react["']|require\(\s*["']react["']\s*\)/.test(code);
     const source = needsReact ? `import React from "react";\n${code}` : code;
     compiled = transform(source, { transforms: ["jsx", "imports"] }).code;
+
+    // Rewrite bare react requires to absolute paths so they resolve from /tmp.
+    compiled = compiled
+      .replace(
+        /require\(\s*["']react-dom\/server(\.node)?["']\s*\)/g,
+        `require(${JSON.stringify(reactServerPath)})`
+      )
+      .replace(
+        /require\(\s*["']react-dom\/client["']\s*\)/g,
+        () => {
+          // react-dom/client is ESM-only in v19; server execution rarely
+          // needs it (preview uses it in the browser instead). Point it at
+          // the CJS client stub when present, else leave it to fail loudly.
+          return `require(${JSON.stringify(
+            join(
+              process.cwd(),
+              "node_modules",
+              "react-dom",
+              "client.js"
+            )
+          )})`;
+        }
+      )
+      .replace(
+        /require\(\s*["']react-dom["']\s*\)/g,
+        `require(${JSON.stringify(reactDomPath)})`
+      )
+      .replace(
+        /require\(\s*["']react["']\s*\)/g,
+        `require(${JSON.stringify(reactPath)})`
+      );
+
+    // If the snippet only defines an App component without printing anything
+    // (e.g. `function App() { return <h1>Hello</h1>; }`), Node exits 0 with
+    // empty stdout and the console looks broken ("no output"). Auto-render
+    // the component to a string so Run always shows something useful.
+    const definesApp =
+      /\bfunction\s+App\b|\bclass\s+App\b|\b(const|let|var)\s+App\s*=/.test(
+        source
+      ) || /export\s+default\b/.test(source);
+    const alreadyPrints =
+      /console\.\w+|process\.stdout|renderToString/.test(source);
+    if (definesApp && !alreadyPrints) {
+      compiled += `\n;try {
+  var __React = require(${JSON.stringify(reactPath)});
+  var __Server = require(${JSON.stringify(reactServerPath)});
+  var __Target = (typeof App !== "undefined" && App) ||
+    (typeof exports !== "undefined" && exports.default) || null;
+  if (__Target && __Server && __Server.renderToString) {
+    console.log(__Server.renderToString(__React.createElement(__Target)));
+  }
+} catch (e) { console.error((e && e.message) || e); }\n`;
+    }
   } catch (error) {
     return {
       success: false,
