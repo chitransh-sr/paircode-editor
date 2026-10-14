@@ -17,7 +17,7 @@ import { useExecution } from "@/hooks/use-execution";
 import { getLanguage, FORMATTABLE_LANGUAGES } from "@/lib/execute/languages";
 import { buildPreviewHtml, stripTypeScript, previewError } from "@/lib/preview/build";
 import { getUserColor } from "@/lib/presence/colors";
-import type { Room } from "@/types/room";
+import type { Room, UpdateRoomInput } from "@/types/room";
 import type { UserPresence } from "@/types/presence";
 import { cn } from "@/lib/utils/cn";
 
@@ -125,17 +125,30 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
   const handleRoomUpdate = useCallback(
     (updatedRoom: Room) => {
-      // Only the interviewer (owner) may change room settings — candidates
-      // get a disabled UI, and the API rejects direct PATCH calls with 403.
-      if (!isOwner) return;
+      if (!fetchedRoom) return;
+      // Send only changed fields: candidates may change language/theme
+      // (when not locked), but read-only stays owner-only — the API
+      // rejects is_read_only without the owner token (403), and the UI
+      // disables that control for candidates.
+      const updates: UpdateRoomInput = {};
+      if (updatedRoom.language !== fetchedRoom.language) {
+        updates.language = updatedRoom.language;
+      }
+      if (updatedRoom.theme !== fetchedRoom.theme) {
+        updates.theme = updatedRoom.theme;
+      }
+      if (updatedRoom.is_read_only !== fetchedRoom.is_read_only) {
+        if (!isOwner) return;
+        updates.is_read_only = updatedRoom.is_read_only;
+      }
+      if (Object.keys(updates).length === 0) return;
+      // Read-only rooms are view-only for candidates — not even language
+      // switches (which reset everyone's code) are allowed.
+      if (!isOwner && editorReadOnly) return;
       // Persist to database (updates fetchedRoom via useRoom hook)
-      fetchRoomUpdate({
-        language: updatedRoom.language,
-        theme: updatedRoom.theme,
-        is_read_only: updatedRoom.is_read_only,
-      }).catch(console.error);
+      fetchRoomUpdate(updates).catch(console.error);
     },
-    [fetchRoomUpdate, isOwner]
+    [fetchRoomUpdate, fetchedRoom, isOwner, editorReadOnly]
   );
 
   const handleCodeChange = useCallback((newCode: string) => {

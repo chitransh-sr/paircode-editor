@@ -68,22 +68,26 @@ export function RoomHeader({
     setTimeout(() => setCopiedId(false), 2000);
   }, [room.id]);
 
+  // Candidates may switch language/theme unless the room is read-only
+  // (view-only); the read-only flag itself stays owner-only.
+  const locked = room.is_read_only && !canManage;
+
   const handleLanguageChange = useCallback(
     (lang: string) => {
-      if (!canManage) return;
+      if (locked) return;
       const newRoom = { ...room, language: lang };
       onRoomUpdate(newRoom);
     },
-    [room, onRoomUpdate, canManage]
+    [room, onRoomUpdate, locked]
   );
 
   const handleThemeChange = useCallback(
     (theme: string) => {
-      if (!canManage) return;
+      if (locked) return;
       const newRoom = { ...room, theme: theme };
       onRoomUpdate(newRoom);
     },
-    [room, onRoomUpdate, canManage]
+    [room, onRoomUpdate, locked]
   );
 
   const handleReadOnlyChange = useCallback(
@@ -192,13 +196,13 @@ export function RoomHeader({
         <LanguageSelect
           value={room.language}
           onChange={handleLanguageChange}
-          disabled={!canManage}
+          disabled={locked}
         />
         <div className="hidden lg:block">
           <ThemeToggle
             theme={room.theme}
             onChange={handleThemeChange}
-            disabled={!canManage}
+            disabled={locked}
           />
         </div>
         <ModeToggle />

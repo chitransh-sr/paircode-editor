@@ -77,16 +77,21 @@ export async function PATCH(
   }
 
   try {
-    // SECURITY: Only the room owner (interviewer) may change room settings.
-    // Candidates calling PATCH directly without the owner token get 403.
-    const ownerToken = request.headers.get("x-room-owner-token");
-    if (!verifyOwnerToken(id, ownerToken)) {
-      return withSecurityHeaders(
-        Response.json({ error: "Only the interviewer can change room settings" }, { status: 403 })
-      );
-    }
-
     const body = await request.json();
+
+    // SECURITY: Split permissions — collaborators may change language and
+    // theme (candidates can switch languages), but only the room owner
+    // (interviewer) may flip read-only mode. Direct API calls that include
+    // is_read_only without the owner token get 403. Rooms without an owner
+    // token keep legacy open behavior.
+    if (body.is_read_only !== undefined) {
+      const ownerToken = request.headers.get("x-room-owner-token");
+      if (!verifyOwnerToken(id, ownerToken)) {
+        return withSecurityHeaders(
+          Response.json({ error: "Only the interviewer can change read-only mode" }, { status: 403 })
+        );
+      }
+    }
 
     const updates: UpdateRoomInput = {};
     // SECURITY: Only allow known fields; sanitize language value

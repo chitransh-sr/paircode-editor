@@ -32,6 +32,9 @@ export function SettingsDrawer({
   onReadOnlyChange,
 }: SettingsDrawerProps) {
   const { theme: appTheme } = useTheme();
+  // Candidates may switch language/theme unless the room is read-only
+  // (view-only); the read-only flag itself stays owner-only.
+  const locked = isReadOnly && !canManage;
 
   return (
     <>
@@ -67,10 +70,10 @@ export function SettingsDrawer({
         </div>
 
         <div className="p-4 space-y-4">
-          {!canManage && (
+          {locked && (
             <div className="rounded-lg border border-accent/20 bg-accent/5 p-3">
               <p className="text-xs text-muted-foreground text-center">
-                Only the interviewer can change room settings.
+                Read-only mode is on — only the interviewer can change settings.
               </p>
             </div>
           )}
@@ -79,7 +82,7 @@ export function SettingsDrawer({
             <LanguageSelect
               value={language}
               onChange={onLanguageChange}
-              disabled={!canManage || isReadOnly}
+              disabled={locked}
             />
           </div>
 
@@ -88,7 +91,7 @@ export function SettingsDrawer({
             <ThemeToggle
               theme={theme}
               onChange={onThemeChange}
-              disabled={!canManage || isReadOnly}
+              disabled={locked}
             />
           </div>
 
