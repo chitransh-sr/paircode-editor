@@ -51,7 +51,6 @@ interface CodeEditorProps {
   isReadOnly?: boolean;
   userName?: string;
   userColor?: string;
-  onNameChange?: (name: string) => void;
   onCodeChange?: (code: string) => void;
   onPresenceChange?: (users: UserPresence[]) => void;
 }
@@ -70,7 +69,6 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
       isReadOnly = false,
       userName = "",
       userColor = "",
-      onNameChange,
       onCodeChange,
       onPresenceChange,
     }: CodeEditorProps,
@@ -84,7 +82,6 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
     const isRemoteChangeRef = useRef(false);
     const cursorDebounceRef = useRef<NodeJS.Timeout | null>(null);
     const decorationIdsRef = useRef<string[] | null>(null);
-    const [showUserMenu, setShowUserMenu] = useState(false);
     const [activeUsers, setActiveUsers] = useState<UserPresence[]>([]);
 
     // Yjs binding to Monaco, using a shared WebsocketProvider so that
@@ -553,76 +550,8 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
       return themeMap[themeValue] || "vs-dark";
     };
 
-    // Handle user name save
-    const handleSetName = () => {
-      const input = prompt("Enter your name:", userName || "");
-      if (input) {
-        const name = input.trim().slice(0, 20);
-        onNameChange?.(name);
-      }
-      setShowUserMenu(false);
-    };
-
-    const handleCopyLink = async () => {
-      try {
-        await navigator.clipboard.writeText(window.location.href);
-      } catch {
-        // Fallback for non-secure contexts: prompt with the URL selected
-        window.prompt("Copy room link:", window.location.href);
-      }
-      setShowUserMenu(false);
-    };
-
-    // Get user color for current user badge (prop keeps SSR/first render identical)
-    const badgeColor = userColor || "#22C55E";
-
     return (
       <div className="relative h-full w-full">
-        <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
-          <div className="flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded-md">
-            <span className="w-2 h-2 bg-accent rounded-full" />
-            <span className="text-muted-foreground">99.9% Uptime</span>
-          </div>
-
-          <div className="relative">
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 bg-muted hover:bg-muted/80 rounded-md px-3 py-1.5 transition-all text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              <div
-                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-accent-foreground"
-                style={{ backgroundColor: userColor }}
-              >
-                {getUserInitials(userName || "")}
-              </div>
-              <span className="hidden sm:inline">{userName || "You"}</span>
-            </button>
-
-            {showUserMenu && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowUserMenu(false)}
-                />
-                <div className="absolute top-full right-0 mt-1 w-48 bg-card rounded-md shadow-lg border border-border z-30">
-                  <button
-                    onClick={handleSetName}
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-muted/50 transition-colors flex items-center gap-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    <span>Change Name</span>
-                  </button>
-                  <button
-                    onClick={handleCopyLink}
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-muted/50 transition-colors flex items-center gap-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    <span>Copy Room Link</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
         {/* Remote cursors overlay */}
         {activeUsers.length > 0 && (
           <div className="absolute bottom-12 left-3 z-20 flex items-center gap-2">

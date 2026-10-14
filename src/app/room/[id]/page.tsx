@@ -513,7 +513,6 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 isReadOnly={editorReadOnly}
                 userName={userName}
                 userColor={userColor}
-                onNameChange={setUserName}
                 onCodeChange={handleCodeChange}
                 onPresenceChange={handlePresenceChange}
               />
