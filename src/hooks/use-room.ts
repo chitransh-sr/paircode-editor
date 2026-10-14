@@ -10,6 +10,7 @@ const DEFAULT_ROOM = (id: string = "default"): Room => ({
   expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   created_by: null,
   is_read_only: false,
+  is_private: false,
 });
 
 export function useRoom(roomId?: string) {
@@ -81,6 +82,25 @@ export function useRoom(roomId?: string) {
   return { room, isLoading, error, refetch: fetchRoom, updateRoom };
 }
 
+export async function verifyRoomPassword(
+  roomId: string,
+  password: string
+): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/rooms/${roomId}/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data.valid === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function createRoom(input?: CreateRoomInput): Promise<Room> {
   const response = await fetch("/api/rooms", {
     method: "POST",
@@ -102,6 +122,7 @@ export async function createRoom(input?: CreateRoomInput): Promise<Room> {
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       created_by: null,
       is_read_only: false,
+      is_private: input?.is_private || false,
     };
   }
 

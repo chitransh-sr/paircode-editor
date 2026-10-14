@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle, RefreshCw, Trash2, Check, Wand2, Eye } from "lucide-react";
 import { RoomHeader } from "@/components/room/room-header";
 import { JoinModal } from "@/components/room/join-modal";
+import { PasswordGate, checkRoomAccess } from "@/components/room/password-gate";
 import { CodeEditor, type CodeEditorHandle } from "@/components/editor/code-editor";
 import { RunButton } from "@/components/editor/run-button";
 import { ConsolePanel } from "@/components/output/console-panel";
@@ -47,6 +48,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const editorRef = useRef<CodeEditorHandle | null>(null);
   const lastLangRef = useRef<string | null>(null);
+  const [forceRender, setForceRender] = useState(0);
 
   // Use execution hook at the page level so the result reaches the console
   const { execute, isExecuting, result: executionResult, clearResult } = useExecution();
@@ -281,6 +283,21 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
           </button>
         </div>
       </div>
+    );
+  }
+
+  // Security: If the room is private and the user hasn't verified the password,
+  // show the PasswordGate before allowing access to the editor.
+  const roomAccessOk = checkRoomAccess(room.id, room);
+  if (!roomAccessOk) {
+    return (
+      <PasswordGate
+        room={room}
+        onUnlocked={() => {
+          // Force a re-render by updating a key state
+          setForceRender((n) => n + 1);
+        }}
+      />
     );
   }
 

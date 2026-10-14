@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Plus, Link2, Briefcase, GraduationCap, Loader2 } from "lucide-react";
+import { Plus, Link2, Briefcase, GraduationCap, Loader2, Lock } from "lucide-react";
 import type { Room } from "@/types/room";
-import { createRoom } from "@/hooks/use-room";
+import { createRoom, verifyRoomPassword } from "@/hooks/use-room";
 import { LANGUAGES, getLanguage } from "@/lib/execute/languages";
 import { cn } from "@/lib/utils/cn";
 
@@ -60,11 +60,17 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
   const [roomName, setRoomName] = useState("");
+  const [roomPassword, setRoomPassword] = useState("");
+  const [isPrivateRoom, setIsPrivateRoom] = useState(true);
   const [joinInput, setJoinInput] = useState("");
   const [joinName, setJoinName] = useState(() => readStoredName());
+  const [joinPassword, setJoinPassword] = useState("");
+  const [requiresPassword, setRequiresPassword] = useState(false);
   const [error, setError] = useState("");
   const [joinError, setJoinError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createdRoomPassword, setCreatedRoomPassword] = useState<string | null>(null);
+  const [createdRoom, setCreatedRoom] = useState<Room | null>(null);
 
   // Get recent rooms from localStorage (lazy init to avoid setState-in-effect)
   // IMPORTANT: initialize empty on first render so it matches the SSR output
@@ -104,10 +110,19 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       return;
     }
 
+    if (isPrivateRoom && roomPassword.length < 4) {
+      setError("Password must be at least 4 characters");
+      return;
+    }
+
     setError("");
     setCreating(true);
     try {
-      const room = await createRoom({ language: selectedLanguage });
+      const room = await createRoom({
+        language: selectedLanguage,
+        is_private: isPrivateRoom,
+        password: isPrivateRoom ? roomPassword : undefined,
+      });
 
       // Store in localStorage (with the display name), then update state.
       const entry: RecentRoom = { ...room, name: roomName.trim() };
@@ -117,7 +132,18 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       localStorage.setItem("recent-rooms", JSON.stringify(updatedRooms));
       setRecentRooms(updatedRooms);
       setRoomName("");
+      setRoomPassword("");
       setShowCreateModal(false);
+
+      // If private, show the password to the interviewer for sharing
+      if (isPrivateRoom) {
+        setCreatedRoom(room);
+        setCreatedRoomPassword(roomPassword);
+      } else {
+        setCreatedRoomPassword(null);
+        setCreatedRoom(null);
+      }
+
       onCreateRoom(room);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create room");
@@ -126,19 +152,69 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
     }
   };
 
-  const handleJoinRoom = () => {
+  const handleJoinRoom = async () => {
     const roomId = parseRoomId(joinInput);
     if (!roomId) {
       setJoinError("Enter a valid room link or room ID");
       return;
     }
+
+    // Check if room is private
+    try {
+      const response = await fetch(`/api/rooms/${roomId}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (response.ok) {
+        const room: Room = await response.json();
+        if (room.is_private) {
+          setRequiresPassword(true);
+          setJoinError("");
+          return; // Show password prompt instead of joining
+        }
+      }
+    } catch {
+      // If check fails, try joining anyway
+    }
+
+    // Not private or check failed — join directly
     const name = joinName.trim();
     if (name) {
       localStorage.setItem("editor-user-name", name);
     }
     setJoinError("");
+    setRequiresPassword(false);
     setShowJoinModal(false);
     onJoinRoom(roomId);
+  };
+
+  const handlePasswordSubmit = async () => {
+    const roomId = parseRoomId(joinInput);
+    if (!roomId || !joinPassword) return;
+
+    setJoinError("");
+    try {
+      const valid = await verifyRoomPassword(roomId, joinPassword);
+      if (!valid) {
+        setJoinError("Incorrect password. Please try again.");
+        return;
+      }
+
+      // Store verification token in sessionStorage (session-only, not localStorage)
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(`room-verified-${roomId}`, "true");
+      }
+
+      const name = joinName.trim();
+      if (name) {
+        localStorage.setItem("editor-user-name", name);
+      }
+      setRequiresPassword(false);
+      setShowJoinModal(false);
+      setJoinPassword("");
+      onJoinRoom(roomId);
+    } catch (err) {
+      setJoinError(err instanceof Error ? err.message : "Failed to verify password");
+    }
   };
 
   return (
@@ -201,6 +277,9 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     <span className="text-sm font-medium text-foreground truncate">
                       {room.name || `Room ${room.id.slice(0, 8)}`}
                     </span>
+                    {room.is_private && (
+                      <Lock className="w-3 h-3 text-accent shrink-0" aria-label="Private room" />
+                    )}
                     <span className="text-sm text-muted-foreground shrink-0">{getLanguage(room.language)?.label || room.language}</span>
                   </div>
                   <Link
@@ -264,6 +343,38 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                   </select>
                 </div>
 
+                <div className="flex items-center gap-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="private-room"
+                    checked={isPrivateRoom}
+                    onChange={(e) => setIsPrivateRoom(e.target.checked)}
+                    className="w-4 h-4 rounded border-border text-accent focus:ring-accent"
+                  />
+                  <label htmlFor="private-room" className="text-sm text-foreground cursor-pointer">
+                    Private room (password protected)
+                  </label>
+                </div>
+
+                {isPrivateRoom && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-foreground">Room Password</label>
+                    <input
+                      type="password"
+                      value={roomPassword}
+                      onChange={(e) => setRoomPassword(e.target.value)}
+                      placeholder="Minimum 4 characters"
+                      className="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
+                      maxLength={128}
+                      minLength={4}
+                      autoComplete="new-password"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Share this password with your candidate so they can join.
+                    </p>
+                  </div>
+                )}
+
                 {error && (
                   <p className="text-sm text-destructive">{error}</p>
                 )}
@@ -288,6 +399,75 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                   >
                     {creating && <Loader2 className="w-4 h-4 animate-spin" />}
                     {creating ? "Creating..." : "Create Room"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Prompt Modal (shown after room ID entered, if room is private) */}
+      {requiresPassword && (
+        <div>
+          <div className="fixed inset-0 bg-black/50 z-50" onClick={closeModals} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-xl p-6 w-full max-w-md border border-border shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <Lock className="w-12 h-12 mx-auto mb-2 text-accent" />
+                <h2 className="text-xl font-semibold text-foreground">Private Room</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  This interview room is password protected. Enter the password to join.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-foreground">Password</label>
+                  <input
+                    type="password"
+                    value={joinPassword}
+                    onChange={(e) => setJoinPassword(e.target.value)}
+                    placeholder="Enter room password"
+                    className="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
+                    autoComplete="new-password"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handlePasswordSubmit();
+                      }
+                    }}
+                  />
+                </div>
+
+                {joinError && (
+                  <p className="text-sm text-destructive">{joinError}</p>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setRequiresPassword(false);
+                      setJoinError("");
+                      setJoinPassword("");
+                    }}
+                    className="flex-1 px-4 py-2 bg-muted text-foreground hover:bg-muted/80 rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handlePasswordSubmit}
+                    disabled={!joinPassword.trim()}
+                    className={cn(
+                      "flex-1 px-4 py-2 rounded transition-all text-sm font-medium flex items-center justify-center gap-2",
+                      !joinPassword.trim()
+                        ? "bg-muted cursor-not-allowed text-muted-foreground"
+                        : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    )}
+                  >
+                    Unlock Room
                   </button>
                 </div>
               </div>
@@ -370,6 +550,80 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     Join Room
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Display Modal (shown after creating a private room) */}
+      {createdRoomPassword && createdRoom && (
+        <div>
+          <div className="fixed inset-0 bg-black/50 z-50" onClick={() => { setCreatedRoomPassword(null); setCreatedRoom(null); }} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-xl p-6 w-full max-w-md border border-border shadow-xl">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-accent/15 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Lock className="w-8 h-8 text-accent" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">Room Created Successfully!</h2>
+                <p className="text-sm text-muted-foreground">
+                  Share this password with your candidate so they can join the interview.
+                </p>
+              </div>
+
+              <div className="bg-muted/30 rounded-lg p-4 mb-4 border border-border">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Room ID</p>
+                <p className="text-sm font-mono text-foreground break-all break-before">
+                  {createdRoom.id}
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Password</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={createdRoomPassword}
+                      readOnly
+                      className="flex-1 bg-background border border-border rounded px-3 py-2 text-sm font-mono text-foreground focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(createdRoomPassword);
+                      }}
+                      className="px-3 py-2 bg-muted hover:bg-muted/80 rounded transition-colors text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      title="Copy password to clipboard"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`/room/${createdRoom.id}`);
+                    setCreatedRoomPassword(null);
+                    setCreatedRoom(null);
+                  }}
+                  className="w-full px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  Copy Room Link & Close
+                </button>
+
+                <button
+                  onClick={() => { setCreatedRoomPassword(null); setCreatedRoom(null); }}
+                  className="w-full px-4 py-2 bg-muted text-foreground hover:bg-muted/80 rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-4 p-3 bg-accent/5 rounded-lg border border-accent/20">
+                <p className="text-xs text-muted-foreground text-center">
+                  The room link has also been saved to your recent rooms.
+                </p>
               </div>
             </div>
           </div>

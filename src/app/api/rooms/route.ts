@@ -44,9 +44,25 @@ export async function POST(request: Request) {
     // SECURITY: Sanitize all inputs — only allow known-safe values
     const language = sanitizeLanguage(body.language);
     const theme = sanitizeTheme(body.theme);
+    // SECURITY: Validate password length
+    const password = typeof body.password === "string" ? body.password : undefined;
+    const is_private = Boolean(body.is_private);
+
+    if (is_private && (!password || password.length < 4)) {
+      return withSecurityHeaders(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: "Password must be at least 4 characters for private rooms",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        ),
+        { "X-RateLimit-Limit": "20", "X-RateLimit-Remaining": String(rateCheck.remaining) }
+      );
+    }
 
     return withSecurityHeaders(
-      Response.json(createRoomRecord({ language, theme }), { status: 201 }),
+      Response.json(createRoomRecord({ language, theme, password, is_private }), { status: 201 }),
       {
         "X-RateLimit-Limit": "20",
         "X-RateLimit-Remaining": String(rateCheck.remaining),
