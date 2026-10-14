@@ -13,20 +13,25 @@ const DEFAULT_ROOM = (id: string = "default"): Room => ({
   is_private: false,
 });
 
-export function useRoom(roomId?: string) {
+export function useRoom(roomId?: string, opts?: { pollIntervalMs?: number }) {
   const [room, setRoom] = useState<Room | null>(null);
   const [isLoading, setIsLoading] = useState(!!roomId);
   const [error, setError] = useState<Error | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  // Real-time settings sync (read-only / language / theme) so the
+  // interviewer's changes reach candidates without a reload. Cheap GET.
+  const pollIntervalMs = opts?.pollIntervalMs ?? 5000;
 
-  const fetchRoom = useCallback(async () => {
+  const fetchRoom = useCallback(async (silent = false) => {
     if (!roomId) {
-      setError(new Error("Room ID not provided"));
+      if (!silent) setError(new Error("Room ID not provided"));
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    if (!silent) {
+      setIsLoading(true);
+      setError(null);
+    }
 
     try {
       const response = await fetch(`/api/rooms/${roomId}`, {
@@ -36,16 +41,21 @@ export function useRoom(roomId?: string) {
       if (response.ok) {
         const data = await response.json();
         setRoom(data);
-      } else {
-        // Fall back to a default room for unknown IDs / errors
+      } else if (!silent) {
+        // Fall back to a default room for unknown IDs / errors.
+        // Silent polls keep the last known room instead — a transient
+        // failure must not wipe real state (e.g. flip a private room
+        // to a public default and drop the password gate).
         setRoom(DEFAULT_ROOM(roomId));
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn("Failed to fetch room, using default:", message);
-      setRoom(DEFAULT_ROOM(roomId));
+      if (!silent) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn("Failed to fetch room, using default:", message);
+        setRoom(DEFAULT_ROOM(roomId));
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [roomId]);
 
@@ -90,6 +100,18 @@ export function useRoom(roomId?: string) {
   useEffect(() => {
     fetchRoom();
   }, [fetchRoom]);
+
+  // Poll room settings so interviewer changes (read-only / language /
+  // theme) propagate to candidates live. Silent: never touches loading
+  // state and never clobbers known state on transient failures.
+  useEffect(() => {
+    if (!roomId || !pollIntervalMs) return;
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      void fetchRoom(true);
+    }, pollIntervalMs);
+    return () => clearInterval(timer);
+  }, [roomId, pollIntervalMs, fetchRoom]);
 
   return { room, isLoading, error, updateError, refetch: fetchRoom, updateRoom };
 }

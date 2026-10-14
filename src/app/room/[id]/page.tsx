@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, use, useRef, useId } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, AlertCircle, RefreshCw, Trash2, Check, Wand2, Eye } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Trash2, Check, Wand2, Eye, RotateCcw } from "lucide-react";
 import { RoomHeader } from "@/components/room/room-header";
 import { JoinModal } from "@/components/room/join-modal";
 import { PasswordGate, checkRoomAccess } from "@/components/room/password-gate";
@@ -247,6 +247,22 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     }
   }, [room, code, formatting]);
 
+  const handleReset = useCallback(() => {
+    if (!room || editorReadOnly) return;
+    const defaultCode = getLanguage(room.language)?.defaultCode ?? "";
+    if (!defaultCode || code === defaultCode) return;
+    // Shared document: resetting replaces the code for everyone in the
+    // room (via the editor's Yjs-synced setCode), so confirm first.
+    if (
+      !window.confirm(
+        "Reset code to the language default? This replaces the current code for everyone in the room."
+      )
+    ) {
+      return;
+    }
+    editorRef.current?.setCode(defaultCode);
+  }, [room, code, editorReadOnly]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       // Ctrl/Cmd + S to save snapshot
@@ -425,6 +441,21 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                     <Wand2 className="w-4 h-4" />
                   )}
                   <span className="hidden sm:inline">Format</span>
+                </button>
+                <button
+                  onClick={handleReset}
+                  disabled={!code || editorReadOnly}
+                  className={cn(
+                    "shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                    "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                    !code || editorReadOnly
+                      ? "bg-muted cursor-not-allowed text-muted-foreground"
+                      : "bg-muted hover:bg-muted/80 text-foreground"
+                  )}
+                  title="Reset to default code"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span className="hidden sm:inline">Reset</span>
                 </button>
                 <button
                   onClick={handleTogglePreview}
