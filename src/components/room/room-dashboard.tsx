@@ -301,21 +301,22 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       <div className="max-w-4xl mx-auto">
         {/* Role selection */}
         <div className="text-center mb-6">
-          <h2 className="text-xl font-semibold text-foreground">How are you joining today?</h2>
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">How are you joining today?</h2>
+          <p className="mt-1.5 text-sm text-muted-foreground">Pick your seat — the room handles the rest.</p>
         </div>
-        <div className="grid sm:grid-cols-2 gap-4 mb-10 sm:mb-16">
+        <div className="grid sm:grid-cols-2 gap-4 sm:gap-5 mb-10 sm:mb-16">
           <button
             onClick={() => setShowCreateModal(true)}
-            className="group text-left bg-card rounded-xl p-6 border border-border hover:border-accent hover:shadow-xl transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="group text-left glass rounded-2xl p-6 sm:p-7 transition-all duration-300 hover:-translate-y-1 hover:border-accent/40 hover:shadow-premium-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <div className="w-10 h-10 bg-accent/15 rounded-md flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-11 h-11 rounded-xl bg-accent/12 border border-accent/20 flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110">
               <Briefcase className="w-5 h-5 text-accent" />
             </div>
-            <h3 className="font-semibold mb-1 text-foreground">I&apos;m the Interviewer</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <h3 className="font-semibold text-lg mb-1.5 text-foreground">I&apos;m the Interviewer</h3>
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
               Create a room, pick a language, and share the link with your candidate.
             </p>
-            <span className="inline-flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground rounded-md font-medium text-sm transition-colors">
+            <span className="inline-flex items-center gap-2 group-hover:gap-3 px-4 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium text-sm shadow-premium hover:bg-accent/90 transition-all duration-300">
               <Plus className="w-4 h-4" />
               Create Interview Room
             </span>
@@ -326,16 +327,16 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
               setJoinName(readStoredName());
               setShowJoinModal(true);
             }}
-            className="group text-left bg-card rounded-xl p-6 border border-border hover:border-accent hover:shadow-xl transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="group text-left glass rounded-2xl p-6 sm:p-7 transition-all duration-300 hover:-translate-y-1 hover:border-accent/40 hover:shadow-premium-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <div className="w-10 h-10 bg-accent/15 rounded-md flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-11 h-11 rounded-xl bg-accent/12 border border-accent/20 flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110">
               <GraduationCap className="w-5 h-5 text-accent" />
             </div>
-            <h3 className="font-semibold mb-1 text-foreground">I&apos;m the Candidate</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <h3 className="font-semibold text-lg mb-1.5 text-foreground">I&apos;m the Candidate</h3>
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
               Have an interview link? Paste it below to join your interview room.
             </p>
-            <span className="inline-flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-md font-medium text-sm transition-colors">
+            <span className="inline-flex items-center gap-2 group-hover:gap-3 px-4 py-2.5 bg-accent/10 text-accent border border-accent/25 rounded-lg font-medium text-sm hover:bg-accent/15 transition-all duration-300">
               <Link2 className="w-4 h-4" />
               Join with a Link
             </span>
@@ -350,7 +351,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
               {recentRooms.slice(0, 5).map((room) => (
                 <div
                   key={room.id}
-                  className="flex items-center justify-between p-3 bg-card rounded-md border border-border hover:bg-muted transition-colors"
+                  className="flex items-center justify-between p-3.5 bg-card/70 rounded-xl border border-border hover:border-accent/40 hover:bg-muted/50 shadow-premium transition-all duration-200"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="text-sm font-medium text-foreground truncate">
@@ -477,7 +478,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                       "flex-1 px-4 py-2.5 rounded-lg transition-all text-sm font-medium flex items-center justify-center gap-2",
                       creating || !roomName.trim()
                         ? "bg-muted cursor-not-allowed text-muted-foreground"
-                        : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-md hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-premium hover:shadow-premium-lg hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                     )}
                   >
                     {creating && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -493,9 +494,9 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       {/* Password Prompt Modal (shown after room ID entered, if room is private) */}
       {requiresPassword && (
         <div>
-          <div className="fixed inset-0 bg-black/50 z-50" onClick={closeModals} />
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" onClick={closeModals} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-card rounded-xl p-5 sm:p-6 w-full max-w-md border border-border shadow-xl max-h-[90dvh] overflow-y-auto"
+            <div className="bg-card rounded-2xl p-5 sm:p-6 w-full max-w-md border border-border shadow-premium-xl max-h-[90dvh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="text-center mb-6">
@@ -549,7 +550,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                       "flex-1 px-4 py-2 rounded transition-all text-sm font-medium flex items-center justify-center gap-2",
                       !joinPassword.trim()
                         ? "bg-muted cursor-not-allowed text-muted-foreground"
-                        : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-premium hover:shadow-premium-lg hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                     )}
                   >
                     Unlock Room
@@ -565,11 +566,11 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
       {showJoinModal && !requiresPassword && (
         <div>
           <div
-            className="fixed inset-0 bg-black/50 z-50"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
             onClick={closeModals}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-card rounded-xl p-5 sm:p-6 w-full max-w-md border border-border shadow-xl max-h-[90dvh] overflow-y-auto"
+            <div className="bg-card rounded-2xl p-5 sm:p-6 w-full max-w-md border border-border shadow-premium-xl max-h-[90dvh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-xl font-semibold mb-4 text-foreground">Join Interview Room</h2>
@@ -629,7 +630,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                       "flex-1 px-4 py-2 rounded transition-all text-sm font-medium flex items-center justify-center gap-2",
                       !joinInput.trim()
                         ? "bg-muted cursor-not-allowed text-muted-foreground"
-                        : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-premium hover:shadow-premium-lg hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                     )}
                   >
                     Join Room

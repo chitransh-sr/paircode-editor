@@ -123,12 +123,12 @@ export function RoomHeader({
   }, [room.id]);
 
   return (
-    <div className="flex items-center justify-between gap-2 flex-wrap px-4 py-2.5 bg-card border-b border-border transition-colors">
+    <div className="sticky top-0 z-30 glass border-b flex items-center justify-between gap-2 flex-wrap px-4 py-2.5 transition-colors">
       {/* Left: Logo & Room Info */}
       <div className="flex items-center gap-3 min-w-0">
         <span className="flex items-center gap-1.5 shrink-0">
           <CodeXml className="w-5 h-5 text-accent" />
-          <span className="text-lg font-bold text-accent truncate hidden sm:inline tracking-tight">PairCode</span>
+          <span className="text-lg font-bold text-gradient truncate hidden sm:inline tracking-tight">PairCode</span>
           <span className="text-lg font-bold text-accent sm:hidden">PC</span>
         </span>
         <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
