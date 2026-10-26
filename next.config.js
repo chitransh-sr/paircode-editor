@@ -2,6 +2,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+
+  // Security upgrade reminders (agent-driven upgrades). Set explicitly as part
+  // of the 16.4.0 → 16.4.3 security upgrade; see
+  // docs/01-app/03-api-reference/05-config/01-next-config-js/agentUpgrade.md
+  experimental: {
+    agentUpgrade: "security",
+  },
+
   images: {
     remotePatterns: [
       {
