@@ -11,6 +11,7 @@ import { RunButton } from "@/components/editor/run-button";
 import { ConsolePanel } from "@/components/output/console-panel";
 import { PreviewPanel } from "@/components/output/preview-panel";
 import { PresenceBar } from "@/components/editor/presence-bar";
+import { Whiteboard } from "@/components/editor/whiteboard";
 import { useRoom, isRoomOwner, sanitizeStoredName } from "@/hooks/use-room";
 import { useLocalStorage } from "@/hooks/use-mobile";
 import { useExecution } from "@/hooks/use-execution";
@@ -47,6 +48,8 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const [formatMsg, setFormatMsg] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(true);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  // Whiteboard overlay: starts closed so SSR matches the first client render.
+  const [whiteboardOpen, setWhiteboardOpen] = useState(false);
   const editorRef = useRef<CodeEditorHandle | null>(null);
   const lastLangRef = useRef<string | null>(null);
   const [forceRender, setForceRender] = useState(0);
@@ -467,6 +470,8 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
           canManage={isOwner}
           onClose={() => router.push("/")}
           onRoomUpdate={handleRoomUpdate}
+          whiteboardOpen={whiteboardOpen}
+          onToggleWhiteboard={() => setWhiteboardOpen((open) => !open)}
         />
 
         {/* Presence bar */}
@@ -476,8 +481,9 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
         {/* Editor + preview split area.
             Mobile-first: stacked (editor top, preview below, scrolls if short).
-            Desktop (lg+): side-by-side halves. */}
-        <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
+            Desktop (lg+): side-by-side halves. `relative` anchors the
+            whiteboard overlay, which covers this area while active. */}
+        <div className="relative flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
           {/* Editor (left half on desktop) */}
           <div className="flex-1 min-h-[320px] lg:min-h-0 min-w-0 flex flex-col">
             <div className="bg-card px-3 py-2 border-b border-border flex items-center justify-between gap-2">
@@ -629,6 +635,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 onClose={() => setPreviewOpen(false)}
               />
             </div>
+          )}
+
+          {/* Whiteboard overlay (covers the editor + preview area while on) */}
+          {whiteboardOpen && (
+            <Whiteboard onClose={() => setWhiteboardOpen(false)} />
           )}
         </div>
 

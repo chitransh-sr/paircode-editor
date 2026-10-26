@@ -10,6 +10,7 @@ import { SettingsDrawer } from "@/components/room/settings-drawer";
 import { LanguageSelect } from "@/components/editor/language-select";
 import { ThemeToggle } from "@/components/editor/theme-toggle";
 import { ModeToggle } from "@/components/editor/mode-toggle";
+import { WhiteboardToggle } from "@/components/editor/whiteboard-toggle";
 
 interface RoomHeaderProps {
   room: Room;
@@ -18,6 +19,10 @@ interface RoomHeaderProps {
   canManage?: boolean;
   onClose: () => void;
   onRoomUpdate: (room: Room) => void;
+  /** Whiteboard overlay state; rendered when a toggle handler is provided. */
+  whiteboardOpen?: boolean;
+  /** Toggles the whiteboard; the button renders to the right of ModeToggle. */
+  onToggleWhiteboard?: () => void;
 }
 
 export function RoomHeader({
@@ -26,6 +31,8 @@ export function RoomHeader({
   canManage = false,
   onClose,
   onRoomUpdate,
+  whiteboardOpen = false,
+  onToggleWhiteboard,
 }: RoomHeaderProps) {
   const [copied, setCopied] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
@@ -211,6 +218,9 @@ export function RoomHeader({
           />
         </div>
         <ModeToggle />
+        {onToggleWhiteboard && (
+          <WhiteboardToggle open={whiteboardOpen} onToggle={onToggleWhiteboard} />
+        )}
         <button
           onClick={copyLink}
           className="p-2 hover:bg-muted rounded-lg transition-colors text-sm flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
