@@ -372,13 +372,13 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
 
   return (
     <div
-      className="absolute inset-0 z-20 flex flex-col select-none bg-card/95 backdrop-blur-sm"
+      className="absolute inset-0 z-20 flex flex-col select-none bg-card/95 backdrop-blur-sm shadow-premium-xl"
       role="group"
       aria-label="Whiteboard"
     >
       {/* Toolbar */}
       <div
-        className="shrink-0 bg-card px-3 py-2 border-b border-border flex items-center gap-1 overflow-x-auto"
+        className="shrink-0 bg-card/95 px-3 py-2 border-b border-border/80 flex items-center gap-1 overflow-x-auto"
         role="toolbar"
         aria-label="Whiteboard tools"
       >
@@ -534,7 +534,7 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
       </div>
 
       {/* Canvas area: solid white board, rounded to match the app's panels */}
-      <div className="flex-1 min-h-0 mx-3 mb-3 rounded-xl border border-border overflow-hidden bg-white">
+      <div className="flex-1 min-h-0 mx-3 mb-3 rounded-xl border border-border overflow-hidden bg-white shadow-premium">
         <canvas
           ref={canvasRef}
           onPointerDown={handlePointerDown}
