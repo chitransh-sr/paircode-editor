@@ -740,7 +740,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
       <div className="relative h-full w-full flex flex-col">
         {/* File tabs (multi-file modes like Web) */}
         {effectiveFiles.length > 1 && (
-          <div className="flex items-center gap-1 px-3 pt-2 bg-card overflow-x-auto shrink-0" role="tablist" aria-label="Files">
+          <div className="flex items-center gap-1 px-3 pt-2 bg-card overflow-x-auto shrink-0 border-b border-border" role="tablist" aria-label="Files">
             {effectiveFiles.map((f) => {
               const isActive = f.name === tabActive;
               return (
@@ -750,10 +750,10 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
                   aria-selected={isActive}
                   onClick={() => switchToFile(f.name)}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                    "flex items-center gap-1.5 px-3 py-1.5 font-mono text-xs transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent border-b-2 border-t-0 border-x-0",
                     isActive
-                      ? "text-foreground border-accent bg-muted/40"
-                      : "text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/30"
+                      ? "text-foreground border-accent bg-foreground/[0.04]"
+                      : "text-muted-foreground border-transparent hover:text-foreground hover:bg-foreground/[0.04]"
                   )}
                 >
                   <span
@@ -778,10 +778,10 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
             {activeUsers.slice(0, 5).map((user) => (
               <div
                 key={user.id}
-                className="flex items-center gap-1 text-xs bg-muted rounded-md px-2 py-1 border border-border"
+                className="flex items-center gap-1 font-mono text-[11px] bg-card/90 border border-foreground/10 px-2 py-1"
               >
                 <div
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-accent-foreground"
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-black"
                   style={{ backgroundColor: user.color }}
                 >
                   {getUserInitials(user.name)}

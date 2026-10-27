@@ -11,11 +11,11 @@ export function ModeToggle() {
     // Render a placeholder to avoid hydration mismatch
     return (
       <button
-        className="p-1.5 bg-accent rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="p-1.5 rounded-[4px] bg-accent text-accent-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         title="Toggle light/dark mode"
         aria-label="Toggle light/dark mode"
       >
-        <Sun className="w-4 h-4 text-accent-foreground" />
+        <Sun className="w-4 h-4" />
       </button>
     );
   }
@@ -24,11 +24,11 @@ export function ModeToggle() {
     <button
       onClick={toggleTheme}
       className={cn(
-        "p-1.5 rounded-md transition-all duration-200",
+        "p-1.5 rounded-[4px] transition-all duration-200 border",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
         theme === 'dark'
-          ? 'bg-accent text-accent-foreground'
-          : 'bg-muted text-foreground hover:bg-muted/80'
+          ? 'bg-accent text-accent-foreground border-accent font-semibold'
+          : 'text-muted-foreground hover:text-foreground border-foreground/15 hover:bg-foreground/[0.06]'
       )}
       title="Toggle light/dark mode"
       aria-label="Toggle light/dark mode"

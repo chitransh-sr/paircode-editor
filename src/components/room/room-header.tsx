@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from "react";
-import { Share2, Check, CodeXml, LogOut, Settings, Eye, EyeOff, Copy, Lock } from "lucide-react";
+import { Share2, Check, LogOut, Settings, Eye, EyeOff, Copy, Lock } from "lucide-react";
 import type { Room } from "@/types/room";
 import { useMobile } from "@/hooks/use-mobile";
 import { getUserColor, getUserInitials } from "@/lib/presence/colors";
@@ -11,6 +11,7 @@ import { LanguageSelect } from "@/components/editor/language-select";
 import { ThemeToggle } from "@/components/editor/theme-toggle";
 import { ModeToggle } from "@/components/editor/mode-toggle";
 import { WhiteboardToggle } from "@/components/editor/whiteboard-toggle";
+import { PairMark } from "@/components/landing-chrome";
 
 interface RoomHeaderProps {
   room: Room;
@@ -123,26 +124,28 @@ export function RoomHeader({
   }, [room.id]);
 
   return (
-    <div className="sticky top-0 z-30 glass border-b flex items-center justify-between gap-2 flex-wrap px-4 py-2.5 transition-colors">
+    <div className="sticky top-0 z-30 bg-card/95 backdrop-blur border-b border-border flex items-center justify-between gap-2 flex-wrap px-4 py-2.5 transition-colors">
       {/* Left: Logo & Room Info */}
       <div className="flex items-center gap-3 min-w-0">
-        <span className="flex items-center gap-1.5 shrink-0">
-          <CodeXml className="w-5 h-5 text-accent" />
-          <span className="text-lg font-bold text-gradient truncate hidden sm:inline tracking-tight">PairCode</span>
-          <span className="text-lg font-bold text-accent sm:hidden">PC</span>
+        <span className="flex items-center gap-2 shrink-0 group">
+          <span className="relative w-6 h-6 rounded-md overflow-hidden flex items-center justify-center bg-foreground/[0.03] border border-foreground/10 group-hover:scale-105 transition-transform duration-300">
+            <PairMark className="w-3.5 h-3.5" />
+          </span>
+          <span className="text-[15px] font-semibold tracking-tight text-foreground truncate hidden sm:inline">PairCode</span>
+          <span className="text-[15px] font-semibold text-accent sm:hidden">PC</span>
         </span>
         <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
-          <span className="hidden sm:inline">Room:</span>
+          <span className="hidden sm:inline text-xs font-mono">room</span>
           <button
             onClick={copyLink}
             title={`Copy full room link:\n${room.id}`}
-            className="bg-background px-2 py-0.5 rounded text-xs border border-border font-mono hover:border-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-pointer"
+            className="bg-foreground/[0.04] border border-foreground/10 hover:border-accent/60 px-2 py-0.5 text-xs font-mono transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-pointer"
           >
             {room.id.slice(0, 8)}
           </button>
           <button
             onClick={copyRoomId}
-            className="p-2 hover:bg-muted rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="p-2 hover:bg-foreground/[0.06] hover:text-foreground rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             title="Copy room link"
             aria-label="Copy room link"
           >
@@ -157,9 +160,9 @@ export function RoomHeader({
           )}
           {canManage && room.is_private && (
             <div className="hidden sm:flex items-center gap-1.5">
-              <span className="text-muted-foreground">Password:</span>
+              <span className="text-xs font-mono text-muted-foreground/80">password</span>
               <code
-                className="bg-background px-2 py-0.5 rounded text-xs border border-border font-mono max-w-28 truncate"
+                className="bg-foreground/[0.04] px-2 py-0.5 text-xs border border-foreground/10 font-mono max-w-28 truncate"
                 title={
                   storedPassword
                     ? showPassword
@@ -172,7 +175,7 @@ export function RoomHeader({
               </code>
               <button
                 onClick={() => setShowPassword(!showPassword)}
-                className="p-2 hover:bg-muted rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="p-2 hover:bg-foreground/[0.06] hover:text-foreground rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 title={showPassword ? "Hide room password" : "View room password"}
                 aria-label={showPassword ? "Hide room password" : "View room password"}
               >
@@ -185,7 +188,7 @@ export function RoomHeader({
               {storedPassword && (
                 <button
                   onClick={copyPassword}
-                  className="p-2 hover:bg-muted rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  className="p-2 hover:bg-foreground/[0.06] hover:text-foreground rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   title="Copy password"
                   aria-label="Copy password"
                 >
@@ -223,7 +226,7 @@ export function RoomHeader({
         )}
         <button
           onClick={copyLink}
-          className="p-2 hover:bg-muted rounded-lg transition-colors text-sm flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="p-2 hover:bg-foreground/[0.06] hover:text-foreground rounded-md transition-colors text-sm flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           title="Share room link"
         >
           {copied ? (
@@ -236,7 +239,7 @@ export function RoomHeader({
         {canManage && (
           <button
             onClick={() => setShowSettings(true)}
-            className="p-2 hover:bg-muted rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="p-2 hover:bg-foreground/[0.06] hover:text-foreground rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             title="Settings"
             aria-label="Open settings"
           >
@@ -251,7 +254,7 @@ export function RoomHeader({
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-2" title={userName || "Guest"}>
           <div
-            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-accent-foreground shrink-0"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-black shrink-0"
             style={{ backgroundColor: userColor || getUserColor(0) }}
           >
             {getUserInitials(userName || "Guest")}
@@ -262,7 +265,7 @@ export function RoomHeader({
         </div>
         <button
           onClick={onClose}
-          className="p-2 hover:bg-muted rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="p-2 hover:bg-foreground/[0.06] hover:text-foreground rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           title="Leave room"
         >
           <LogOut className="w-4 h-4 text-muted-foreground" />

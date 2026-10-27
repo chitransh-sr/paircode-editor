@@ -1,16 +1,22 @@
 'use client';
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { User } from "lucide-react";
 import { getUserColor } from "@/lib/presence/colors";
 import { sanitizeStoredName } from "@/hooks/use-room";
 import { cn } from "@/lib/utils/cn";
+import { Corners } from "@/components/landing-chrome";
 
 interface JoinModalProps {
   open: boolean;
   onJoin: (name: string, color: string) => void;
   defaultName?: string;
 }
+
+/** Input classes shared with the dashboard modals (landing chrome). */
+const inputClass =
+  "w-full bg-foreground/[0.04] border border-foreground/10 rounded-[4px] px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/40 transition-colors";
 
 export function JoinModal({ open, onJoin, defaultName }: JoinModalProps) {
   const [name, setName] = useState(() => {
@@ -37,69 +43,80 @@ export function JoinModal({ open, onJoin, defaultName }: JoinModalProps) {
 
   if (!open) return null;
 
-  return (
+  // Portaled to body so `fixed` layers can never inherit a transformed
+  // (containing-block) ancestor — same rule as the other room overlays.
+  return createPortal(
     <>
-      <div className="fixed inset-0 bg-black/50 z-50" />
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-card rounded-lg p-5 sm:p-6 w-full max-w-md border border-border shadow-xl max-h-[90dvh] overflow-y-auto">
-          <div className="text-center mb-6">
-            <User className="w-12 h-12 mx-auto mb-2 text-accent" />
-            <h2 className="text-xl font-semibold text-foreground">Join Interview Room</h2>
-            <p className="text-sm text-muted-foreground mt-1">
+        <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-5 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto">
+          <Corners />
+          <div className="relative z-10">
+            {/* Square accent plate + mono eyebrow (landing card header) */}
+            <div className="w-10 h-10 bg-accent/15 border border-accent/20 flex items-center justify-center mb-5">
+              <User className="w-5 h-5 text-accent" />
+            </div>
+            <p className="font-mono text-[11px] tracking-[0.2em] text-accent mb-3">{`// JOIN ROOM`}</p>
+            <h2 className="text-xl font-medium tracking-tight text-foreground">Join Interview Room</h2>
+            <p className="text-[13px] text-muted-foreground mt-1 mb-6">
               Enter your name to join the interview
             </p>
-          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Your Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Sarah Chen"
-                className="w-full bg-background border border-border rounded px-3 py-2 text-base sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
-                maxLength={30}
-                autoFocus
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Cursor Color</label>
-              <div className="flex gap-2 flex-wrap">
-                {["#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9"].map(
-                  (c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setColor(c)}
-                      className={cn(
-                        "w-8 h-8 rounded-full transition-transform",
-                        color === c && "ring-2 ring-offset-2 ring-offset-background scale-110"
-                      )}
-                      style={{ backgroundColor: c }}
-                    />
-                  )
-                )}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground/80 mb-1.5">Your Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., Sarah Chen"
+                  className={inputClass}
+                  maxLength={30}
+                  autoFocus
+                  required
+                />
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={!name.trim()}
-              className={cn(
-                "w-full px-4 py-2 rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                !name.trim()
-                  ? "bg-muted cursor-not-allowed text-muted-foreground"
-                  : "bg-accent hover:bg-accent/90 text-accent-foreground"
-              )}
-            >
-              Join Room
-            </button>
-          </form>
+              <div>
+                <label className="block text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground/80 mb-1.5">Cursor Color</label>
+                <div className="flex gap-2 flex-wrap">
+                  {["#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9"].map(
+                    (c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setColor(c)}
+                        aria-label={`Cursor color ${c}`}
+                        aria-pressed={color === c}
+                        className={cn(
+                          "w-8 h-8 rounded-full transition-all duration-200 hover:scale-110",
+                          color === c && "ring-2 ring-accent ring-offset-2 ring-offset-card scale-110"
+                        )}
+                        style={{ backgroundColor: c }}
+                      />
+                    )
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={!name.trim()}
+                className={cn(
+                  "w-full px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
+                  !name.trim()
+                    ? "bg-foreground/[0.06] text-muted-foreground border border-foreground/10 cursor-not-allowed"
+                    : "bg-accent text-accent-foreground hover:bg-accent/90 font-semibold shadow-[0_0_24px_-8px_rgba(34,197,94,0.6)]"
+                )}
+              >
+                <User className="w-4 h-4" />
+                Join Room
+              </button>
+            </form>
+          </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }

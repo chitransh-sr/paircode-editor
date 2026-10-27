@@ -38,19 +38,19 @@ export function ShareLink({ roomId, onCopy }: ShareLinkProps) {
   };
 
   return (
-    <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2 border border-border">
+    <div className="flex items-center gap-2 bg-foreground/[0.04] px-3 py-2 border border-foreground/10">
       <Share2 className="w-4 h-4 text-muted-foreground shrink-0" />
       <input
         ref={inputRef}
         type="text"
         value={roomUrl}
         readOnly
-        className="bg-transparent border-none outline-none text-sm text-foreground w-64 truncate"
+        className="bg-transparent border-none outline-none text-sm font-mono text-foreground w-64 truncate"
         onFocus={(e) => e.target.select()}
       />
       <button
         onClick={copyToClipboard}
-        className="p-1 hover:bg-muted/80 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="p-1 hover:bg-foreground/[0.06] rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         title="Copy link"
       >
         {copied ? (

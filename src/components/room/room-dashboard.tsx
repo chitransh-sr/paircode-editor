@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Plus, Link2, Briefcase, GraduationCap, Loader2, Lock, ChevronDown } from "lucide-react";
 import type { Room } from "@/types/room";
 import { createRoom, verifyRoomPassword, sanitizeStoredName } from "@/hooks/use-room";
 import { LANGUAGES, getLanguage } from "@/lib/execute/languages";
 import { cn } from "@/lib/utils/cn";
+import { Corners, chipClasses, sweepClasses, iconClasses, labelClasses, arrowClasses } from "@/components/landing-chrome";
 
 interface RoomDashboardProps {
   onCreateRoom: (room: Room) => void;
@@ -16,6 +18,17 @@ interface RoomDashboardProps {
 interface RecentRoom extends Room {
   name?: string;
 }
+
+/** Mono section eyebrow from the landing page (`// LABEL`).
+    The slashes are rendered as an expression so ESLint's
+    JSX comment rule doesn't mistake the text for a comment. */
+function Eyebrow({ label, className = "" }: { label: string; className?: string }) {
+  return <p className={`font-mono text-[11px] tracking-[0.2em] text-accent ${className}`}>{`// ${label}`}</p>;
+}
+
+/** Input field classes shared by every dashboard modal (landing chrome). */
+const inputClass =
+  "w-full bg-foreground/[0.04] border border-foreground/10 rounded-[4px] px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/40 transition-colors";
 
 function readRecentRooms(): RecentRoom[] {
   if (typeof window === "undefined") return [];
@@ -44,6 +57,34 @@ function parseRoomId(input: string): string | null {
   if (urlMatch) return decodeURIComponent(urlMatch[1]);
   if (/^[0-9a-f-]{8,}$/i.test(value)) return value;
   return null;
+}
+
+/** Landing-style inline swipe-fill CTA (span — used inside card <button>s).
+    Shares its chrome with the hero CTAs (chipClasses/sweep/icon/label/arrow)
+    so both stay pixel-consistent and theme-legal. pointer-events-none routes
+    hover to the parent role card — the landing-lobby behavior (hovering the
+    card fills its CTA) — while the card's own onClick handles activation. */
+function CardCta({ icon, label, variant }: { icon: React.ReactNode; label: string; variant: "accent" | "white" }) {
+  return (
+    <span
+      className={cn(
+        chipClasses(variant),
+        "mt-1 w-fit pointer-events-none"
+      )}
+    >
+      <Corners />
+      <span className={sweepClasses(variant, "sm")} />
+      <span className="relative z-10 flex items-center gap-2.5">
+        <span className={iconClasses(variant, "sm")}>
+          {icon}
+        </span>
+        <span className={labelClasses(variant, "sm")}>
+          {label}
+        </span>
+      </span>
+      <span className={cn("relative z-10", arrowClasses(variant))}>→</span>
+    </span>
+  );
 }
 
 export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) {
@@ -300,26 +341,27 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
     <>
       <div className="max-w-4xl mx-auto">
         {/* Role selection */}
-        <div className="text-center mb-6">
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">How are you joining today?</h2>
-          <p className="mt-1.5 text-sm text-muted-foreground">Pick your seat — the room handles the rest.</p>
+        <div className="text-center mb-8">
+          <Eyebrow label="PICK YOUR SEAT" className="mb-3" />
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-medium tracking-[-0.02em] text-foreground leading-tight mb-2">How are you joining today?</h2>
+          <p className="text-[15px] text-muted-foreground">Pick your seat — the room handles the rest.</p>
         </div>
-        <div className="grid sm:grid-cols-2 gap-4 sm:gap-5 mb-10 sm:mb-16">
+        <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-10 sm:mb-14">
           <button
             onClick={() => setShowCreateModal(true)}
-            className="group text-left glass rounded-2xl p-6 sm:p-7 transition-all duration-300 hover:-translate-y-1 hover:border-accent/40 hover:shadow-premium-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="group text-left bg-card border border-border hover:border-accent/40 card-lift p-6 sm:p-7 flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <div className="w-11 h-11 rounded-xl bg-accent/12 border border-accent/20 flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110">
+            <Corners />
+            <div className="w-10 h-10 bg-accent/15 border border-accent/20 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-300">
               <Briefcase className="w-5 h-5 text-accent" />
             </div>
-            <h3 className="font-semibold text-lg mb-1.5 text-foreground">I&apos;m the Interviewer</h3>
-            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+            <h3 className="text-xl font-medium text-foreground tracking-tight mb-1">I&apos;m the Interviewer</h3>
+            <p className="text-[13px] text-muted-foreground mb-6 leading-relaxed">
               Create a room, pick a language, and share the link with your candidate.
             </p>
-            <span className="inline-flex items-center gap-2 group-hover:gap-3 px-4 py-2.5 bg-accent text-accent-foreground rounded-lg font-medium text-sm shadow-premium hover:bg-accent/90 transition-all duration-300">
-              <Plus className="w-4 h-4" />
-              Create Interview Room
-            </span>
+            <div className="mt-auto">
+              <CardCta icon={<Plus className="w-4 h-4" />} label="Create Interview Room" variant="accent" />
+            </div>
           </button>
 
           <button
@@ -327,46 +369,54 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
               setJoinName(readStoredName());
               setShowJoinModal(true);
             }}
-            className="group text-left glass rounded-2xl p-6 sm:p-7 transition-all duration-300 hover:-translate-y-1 hover:border-accent/40 hover:shadow-premium-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="group text-left bg-card border border-border hover:border-accent/40 card-lift p-6 sm:p-7 flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <div className="w-11 h-11 rounded-xl bg-accent/12 border border-accent/20 flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110">
+            <Corners />
+            <div className="w-10 h-10 bg-accent/15 border border-accent/20 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-300">
               <GraduationCap className="w-5 h-5 text-accent" />
             </div>
-            <h3 className="font-semibold text-lg mb-1.5 text-foreground">I&apos;m the Candidate</h3>
-            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+            <h3 className="text-xl font-medium text-foreground tracking-tight mb-1">I&apos;m the Candidate</h3>
+            <p className="text-[13px] text-muted-foreground mb-6 leading-relaxed">
               Have an interview link? Paste it below to join your interview room.
             </p>
-            <span className="inline-flex items-center gap-2 group-hover:gap-3 px-4 py-2.5 bg-accent/10 text-accent border border-accent/25 rounded-lg font-medium text-sm hover:bg-accent/15 transition-all duration-300">
-              <Link2 className="w-4 h-4" />
-              Join with a Link
-            </span>
+            <div className="mt-auto">
+              <CardCta icon={<Link2 className="w-4 h-4" />} label="Join with a Link" variant="white" />
+            </div>
           </button>
         </div>
 
         {/* Recent rooms — suppressed until after first mount to avoid SSR/client mismatch */}
         {!suppressRecent && recentRooms.length > 0 && (
-          <div className="mb-12 sm:mb-20">
-            <h2 className="text-lg font-semibold mb-3 text-foreground">Recent Rooms</h2>
+          <div className="mb-12 sm:mb-16">
+            <div className="flex items-baseline justify-between gap-3 mb-4">
+              <Eyebrow label="RECENT ROOMS" className="text-muted-foreground/70" />
+              <span className="font-mono text-[11px] text-muted-foreground/50">
+                {recentRooms.length} saved locally
+              </span>
+            </div>
             <div className="space-y-2">
               {recentRooms.slice(0, 5).map((room) => (
                 <div
                   key={room.id}
-                  className="flex items-center justify-between p-3.5 bg-card/70 rounded-xl border border-border hover:border-accent/40 hover:bg-muted/50 shadow-premium transition-all duration-200"
+                  className="group flex items-center justify-between px-3.5 py-3 bg-card border border-border hover:border-accent/40 transition-all duration-200"
                 >
                   <div className="flex items-center gap-3 min-w-0">
+                    <span className="relative w-1.5 h-1.5 rounded-full bg-accent shrink-0 ping-ring" />
                     <span className="text-sm font-medium text-foreground truncate">
                       {room.name || `Room ${room.id.slice(0, 8)}`}
                     </span>
                     {room.is_private && (
                       <Lock className="w-3 h-3 text-accent shrink-0" aria-label="Private room" />
                     )}
-                    <span className="text-sm text-muted-foreground shrink-0 hidden sm:inline">{getLanguage(room.language)?.label || room.language}</span>
+                    <span className="text-xs text-muted-foreground font-mono shrink-0 hidden sm:inline">
+                      {getLanguage(room.language)?.label || room.language}
+                    </span>
                   </div>
                   <button
                     onClick={() => handleRecentJoin(room)}
-                    className="text-sm text-accent hover:text-accent/90 hover:bg-accent/10 transition-colors focus-visible:opacity-100 shrink-0 ml-3 px-3 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-md"
+                    className="shrink-0 ml-3 inline-flex items-center gap-2 px-3 py-1.5 text-xs border border-foreground/15 text-muted-foreground hover:border-foreground/40 hover:text-foreground font-mono transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   >
-                    Join
+                    Join →
                   </button>
                 </div>
               ))}
@@ -375,271 +425,293 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
         )}
       </div>
 
-      {/* Create Room Modal */}
-      {showCreateModal && (
+      {/* Create Room Modal — portaled to body: this dashboard is wrapped in a
+          Reveal (transform + will-change), which would otherwise become the
+          containing block for `fixed` elements and clip the modal. */}
+      {showCreateModal &&
+        createPortal(
         <div>
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
             onClick={closeModals}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl p-5 sm:p-6 w-full max-w-md border border-border shadow-2xl max-h-[90dvh] overflow-y-auto"
+            <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-5 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-xl font-semibold mb-1 text-foreground">Create Interview Room</h2>
-              <p className="text-sm text-muted-foreground mb-5">Set up a private room and share the password with your candidate.</p>
+              <Corners />
+              <div className="relative z-10">
+                <Eyebrow label="CREATE ROOM" className="mb-3" />
+                <h2 className="text-xl font-medium tracking-tight text-foreground mb-1">Create Interview Room</h2>
+                <p className="text-[13px] text-muted-foreground mb-6">Set up a private room and share the password with your candidate.</p>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1.5 text-foreground">Room Name</label>
-                  <input
-                    type="text"
-                    value={roomName}
-                    onChange={(e) => setRoomName(e.target.value)}
-                    placeholder="e.g., Frontend Interview - John"
-                    className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted-foreground/60 shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition"
-                    maxLength={50}
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleCreateRoom();
-                      }
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1.5 text-foreground">Language</label>
-                  <div className="relative">
-                    <select
-                      value={selectedLanguage}
-                      onChange={(e) => setSelectedLanguage(e.target.value)}
-                      className="w-full appearance-none bg-background border border-border rounded-lg pl-3.5 pr-10 py-2.5 text-base sm:text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition cursor-pointer"
-                    >
-                      {LANGUAGES.filter((lang) => !lang.hidden).map((lang) => (
-                        <option key={lang.id} value={lang.name}>
-                          {lang.label}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-muted-foreground pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2" />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                  <input
-                    type="checkbox"
-                    id="private-room"
-                    checked={isPrivateRoom}
-                    onChange={(e) => setIsPrivateRoom(e.target.checked)}
-                    className="w-4 h-4 rounded border-border text-accent focus:ring-accent/60"
-                  />
-                  <label htmlFor="private-room" className="text-sm text-foreground cursor-pointer select-none">
-                    Private room <span className="text-muted-foreground">(password protected)</span>
-                  </label>
-                </div>
-
-                {isPrivateRoom && (
+                <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-foreground">Room Password</label>
+                    <label className="block text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground/80 mb-1.5">Room Name</label>
                     <input
-                      type="password"
-                      value={roomPassword}
-                      onChange={(e) => setRoomPassword(e.target.value)}
-                      placeholder="Minimum 4 characters"
-                      className="w-full bg-background border border-border rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-foreground font-mono placeholder:text-muted-foreground/60 placeholder:font-sans shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-accent transition"
-                      maxLength={128}
-                      minLength={4}
-                      autoComplete="new-password"
+                      type="text"
+                      value={roomName}
+                      onChange={(e) => setRoomName(e.target.value)}
+                      placeholder="e.g., Frontend Interview - John"
+                      className={inputClass}
+                      maxLength={50}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleCreateRoom();
+                        }
+                      }}
                     />
-                    <p className="text-xs text-muted-foreground mt-1.5">
-                      Share this password with your candidate so they can join.
-                    </p>
                   </div>
-                )}
 
-                {error && (
-                  <p className="text-sm text-destructive">{error}</p>
-                )}
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground/80 mb-1.5">Language</label>
+                    <div className="relative">
+                      <select
+                        value={selectedLanguage}
+                        onChange={(e) => setSelectedLanguage(e.target.value)}
+                        className={cn(inputClass, "appearance-none pr-10 cursor-pointer")}
+                      >
+                        {LANGUAGES.filter((lang) => !lang.hidden).map((lang) => (
+                          <option key={lang.id} value={lang.name}>
+                            {lang.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-muted-foreground pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2" />
+                    </div>
+                  </div>
 
-                <div className="flex gap-3 pt-1">
-                  <button
-                    onClick={closeModals}
-                    disabled={creating}
-                    className="flex-1 px-4 py-2.5 bg-muted text-foreground hover:bg-muted/80 rounded-lg transition text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreateRoom}
-                    disabled={creating || !roomName.trim()}
-                    className={cn(
-                      "flex-1 px-4 py-2.5 rounded-lg transition-all text-sm font-medium flex items-center justify-center gap-2",
-                      creating || !roomName.trim()
-                        ? "bg-muted cursor-not-allowed text-muted-foreground"
-                        : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-premium hover:shadow-premium-lg hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                    )}
-                  >
-                    {creating && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {creating ? "Creating..." : "Create Room"}
-                  </button>
+                  <div className="flex items-center gap-2.5 border border-foreground/10 bg-foreground/[0.03] px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      id="private-room"
+                      checked={isPrivateRoom}
+                      onChange={(e) => setIsPrivateRoom(e.target.checked)}
+                      className="w-4 h-4 rounded-[2px] border-border accent-[#22C55E] cursor-pointer"
+                    />
+                    <label htmlFor="private-room" className="text-sm text-foreground cursor-pointer select-none flex-1">
+                      Private room <span className="text-muted-foreground">(password protected)</span>
+                    </label>
+                    <span className="relative w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                  </div>
+
+                  {isPrivateRoom && (
+                    <div>
+                      <label className="block text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground/80 mb-1.5">Room Password</label>
+                      <input
+                        type="password"
+                        value={roomPassword}
+                        onChange={(e) => setRoomPassword(e.target.value)}
+                        placeholder="Minimum 4 characters"
+                        className={cn(inputClass, "font-mono placeholder:font-sans")}
+                        maxLength={128}
+                        minLength={4}
+                        autoComplete="new-password"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        Share this password with your candidate so they can join.
+                      </p>
+                    </div>
+                  )}
+
+                  {error && (
+                    <p className="text-[13px] text-destructive font-mono">{error}</p>
+                  )}
+
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      onClick={closeModals}
+                      disabled={creating}
+                      className="flex-1 px-4 py-2.5 border border-foreground/15 text-muted-foreground hover:text-foreground hover:border-foreground/40 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCreateRoom}
+                      disabled={creating || !roomName.trim()}
+                      className={cn(
+                        "flex-1 px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
+                        creating || !roomName.trim()
+                          ? "bg-foreground/[0.06] text-muted-foreground border border-foreground/10 cursor-not-allowed"
+                          : "bg-accent text-accent-foreground hover:bg-accent/90 font-semibold shadow-[0_0_24px_-8px_rgba(34,197,94,0.6)]"
+                      )}
+                    >
+                      {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {creating ? "Creating..." : "Create Room"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Password Prompt Modal (shown after room ID entered, if room is private) */}
-      {requiresPassword && (
+      {requiresPassword &&
+        createPortal(
         <div>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" onClick={closeModals} />
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" onClick={closeModals} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl p-5 sm:p-6 w-full max-w-md border border-border shadow-premium-xl max-h-[90dvh] overflow-y-auto"
+            <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-5 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="text-center mb-6">
-                <Lock className="w-12 h-12 mx-auto mb-2 text-accent" />
-                <h2 className="text-xl font-semibold text-foreground">Private Room</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  This interview room is password protected. Enter the password to join.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-foreground">Password</label>
-                  <input
-                    type="password"
-                    value={joinPassword}
-                    onChange={(e) => setJoinPassword(e.target.value)}
-                    placeholder="Enter room password"
-                    className="w-full bg-background border border-border rounded px-3 py-2 text-base sm:text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
-                    autoComplete="new-password"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handlePasswordSubmit();
-                      }
-                    }}
-                  />
+              <Corners />
+              <div className="relative z-10">
+                <Eyebrow label="PRIVATE ROOM" className="mb-3" />
+                <div className="flex flex-col items-start mb-5">
+                  <h2 className="text-xl font-medium tracking-tight text-foreground">Private Room</h2>
+                  <p className="text-[13px] text-muted-foreground mt-1">
+                    This interview room is password protected. Enter the password to join.
+                  </p>
                 </div>
 
-                {joinError && (
-                  <p className="text-sm text-destructive">{joinError}</p>
-                )}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground/80 mb-1.5">Password</label>
+                    <input
+                      type="password"
+                      value={joinPassword}
+                      onChange={(e) => setJoinPassword(e.target.value)}
+                      placeholder="Enter room password"
+                      className={cn(inputClass, "font-mono placeholder:font-sans")}
+                      autoComplete="new-password"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handlePasswordSubmit();
+                        }
+                      }}
+                    />
+                  </div>
 
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => {
-                      setRequiresPassword(false);
-                      setJoinError("");
-                      setJoinPassword("");
-                      setShowJoinModal(true);
-                    }}
-                    className="flex-1 px-4 py-2 bg-muted text-foreground hover:bg-muted/80 rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={handlePasswordSubmit}
-                    disabled={!joinPassword.trim()}
-                    className={cn(
-                      "flex-1 px-4 py-2 rounded transition-all text-sm font-medium flex items-center justify-center gap-2",
-                      !joinPassword.trim()
-                        ? "bg-muted cursor-not-allowed text-muted-foreground"
-                        : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-premium hover:shadow-premium-lg hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                    )}
-                  >
-                    Unlock Room
-                  </button>
+                  {joinError && (
+                    <p className="text-[13px] text-destructive font-mono">{joinError}</p>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setRequiresPassword(false);
+                        setJoinError("");
+                        setJoinPassword("");
+                        setShowJoinModal(true);
+                      }}
+                      className="flex-1 px-4 py-2.5 border border-foreground/15 text-muted-foreground hover:text-foreground hover:border-foreground/40 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handlePasswordSubmit}
+                      disabled={!joinPassword.trim()}
+                      className={cn(
+                        "flex-1 px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
+                        !joinPassword.trim()
+                          ? "bg-foreground/[0.06] text-muted-foreground border border-foreground/10 cursor-not-allowed"
+                          : "bg-accent text-accent-foreground hover:bg-accent/90 font-semibold shadow-[0_0_24px_-8px_rgba(34,197,94,0.6)]"
+                      )}
+                    >
+                      <Lock className="w-4 h-4" />
+                      Unlock Room
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Join Room Modal — hidden while password step is active */}
-      {showJoinModal && !requiresPassword && (
+      {/* Join Room Modal — hidden while password step is active (also portaled) */}
+      {showJoinModal && !requiresPassword &&
+        createPortal(
         <div>
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
             onClick={closeModals}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-card rounded-2xl p-5 sm:p-6 w-full max-w-md border border-border shadow-premium-xl max-h-[90dvh] overflow-y-auto"
+            <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-5 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-xl font-semibold mb-4 text-foreground">Join Interview Room</h2>
+              <Corners />
+              <div className="relative z-10">
+                <Eyebrow label="JOIN ROOM" className="mb-3" />
+                <h2 className="text-xl font-medium tracking-tight text-foreground mb-5">Join Interview Room</h2>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-foreground">Room Link or ID</label>
-                  <input
-                    type="text"
-                    value={joinInput}
-                    onChange={(e) => setJoinInput(e.target.value)}
-                    placeholder="Paste the interview link here"
-                    className="w-full bg-background border border-border rounded px-3 py-2 text-base sm:text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleJoinRoom();
-                      }
-                    }}
-                  />
-                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground/80 mb-1.5">Room Link or ID</label>
+                    <input
+                      type="text"
+                      value={joinInput}
+                      onChange={(e) => setJoinInput(e.target.value)}
+                      placeholder="Paste the interview link here"
+                      className={cn(inputClass, "font-mono placeholder:font-sans")}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleJoinRoom();
+                        }
+                      }}
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-foreground">Your Name</label>
-                  <input
-                    type="text"
-                    value={joinName}
-                    onChange={(e) => setJoinName(e.target.value)}
-                    placeholder="e.g., Sarah Chen"
-                    className="w-full bg-background border border-border rounded px-3 py-2 text-base sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
-                    maxLength={30}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleJoinRoom();
-                      }
-                    }}
-                  />
-                </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground/80 mb-1.5">Your Name</label>
+                    <input
+                      type="text"
+                      value={joinName}
+                      onChange={(e) => setJoinName(e.target.value)}
+                      placeholder="e.g., Sarah Chen"
+                      className={inputClass}
+                      maxLength={30}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleJoinRoom();
+                        }
+                      }}
+                    />
+                  </div>
 
-                {joinError && (
-                  <p className="text-sm text-destructive">{joinError}</p>
-                )}
+                  {joinError && (
+                    <p className="text-[13px] text-destructive font-mono">{joinError}</p>
+                  )}
 
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={closeModals}
-                    className="flex-1 px-4 py-2 bg-muted text-foreground hover:bg-muted/80 rounded transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleJoinRoom}
-                    disabled={!joinInput.trim()}
-                    className={cn(
-                      "flex-1 px-4 py-2 rounded transition-all text-sm font-medium flex items-center justify-center gap-2",
-                      !joinInput.trim()
-                        ? "bg-muted cursor-not-allowed text-muted-foreground"
-                        : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-premium hover:shadow-premium-lg hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                    )}
-                  >
-                    Join Room
-                  </button>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={closeModals}
+                      className="flex-1 px-4 py-2.5 border border-foreground/15 text-muted-foreground hover:text-foreground hover:border-foreground/40 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleJoinRoom}
+                      disabled={!joinInput.trim()}
+                      className={cn(
+                        "flex-1 px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
+                        !joinInput.trim()
+                          ? "bg-foreground/[0.06] text-muted-foreground border border-foreground/10 cursor-not-allowed"
+                          : "bg-accent text-accent-foreground hover:bg-accent/90 font-semibold shadow-[0_0_24px_-8px_rgba(34,197,94,0.6)]"
+                      )}
+                    >
+                      <Link2 className="w-4 h-4" />
+                      Join Room
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </>

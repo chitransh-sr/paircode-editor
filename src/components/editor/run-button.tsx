@@ -24,11 +24,11 @@ export function RunButton({ code, isExecuting, result, onExecute, disabled }: Ru
         onClick={handleClick}
         disabled={disabled || isExecuting || !code}
         className={cn(
-          "px-3 py-1.5 rounded-md font-medium text-sm transition-all",
+          "px-3 py-1.5 rounded-[4px] font-semibold text-sm transition-all active:scale-[0.96]",
           "flex items-center gap-2",
           disabled || isExecuting || !code
-            ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
-            : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-md hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            ? "opacity-50 cursor-not-allowed bg-foreground/[0.06] border border-foreground/10 text-muted-foreground"
+            : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-[0_0_20px_-6px_rgba(34,197,94,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         )}
       >
         {isExecuting ? (
@@ -38,7 +38,7 @@ export function RunButton({ code, isExecuting, result, onExecute, disabled }: Ru
           </>
         ) : (
           <>
-            <Play className="w-4 h-4" />
+            <Play className="w-4 h-4 fill-current" />
             <span className="hidden sm:inline">Run</span>
           </>
         )}
@@ -52,21 +52,21 @@ export function RunButton({ code, isExecuting, result, onExecute, disabled }: Ru
 function ExecutionResultBadge({ result }: { result: ExecutionResult }) {
   if (!result.success) {
     return (
-      <span className="text-xs text-destructive-foreground bg-destructive/30 px-2 py-0.5 rounded">
+      <span className="text-[11px] font-mono text-destructive bg-destructive/10 border border-destructive/20 px-2 py-0.5 rounded-[4px]">
         Error
       </span>
     );
   }
   if (result.exit_code === 0) {
     return (
-      <span className="text-xs text-accent bg-accent/20 px-2 py-0.5 rounded">
+      <span className="text-[11px] font-mono text-accent bg-accent/10 border border-accent/20 px-2 py-0.5 rounded-[4px]">
         Exit 0
       </span>
     );
   }
   if (result.exit_code) {
     return (
-      <span className="text-xs text-orange-400 bg-orange-900/30 px-2 py-0.5 rounded">
+      <span className="text-[11px] font-mono text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-[4px]">
         Exit {result.exit_code}
       </span>
     );

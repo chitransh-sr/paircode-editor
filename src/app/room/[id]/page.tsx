@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, use, useRef, useId, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, AlertCircle, RefreshCw, Trash2, Check, Wand2, Eye, RotateCcw, Globe } from "lucide-react";
+import { Loader2, RefreshCw, Trash2, Check, Wand2, Eye, RotateCcw, Globe } from "lucide-react";
 import { RoomHeader } from "@/components/room/room-header";
 import { JoinModal } from "@/components/room/join-modal";
 import { PasswordGate, checkRoomAccess } from "@/components/room/password-gate";
@@ -405,7 +405,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-accent mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading room...</p>
+          <p className="font-mono text-[11px] tracking-[0.2em] text-muted-foreground">loading room…</p>
         </div>
       </div>
     );
@@ -415,11 +415,12 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-          <p className="text-foreground mb-4">{error || "Room not found"}</p>
+          <p className="font-mono text-[11px] tracking-[0.2em] text-destructive mb-3">{`// ROOM ERROR`}</p>
+          <p className="text-foreground text-lg font-medium tracking-tight mb-2">{error || "Room not found"}</p>
+          <p className="text-sm text-muted-foreground mb-6">The link may be expired or incorrect.</p>
           <button
             onClick={() => router.push("/")}
-            className="px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold text-sm transition-colors active:scale-[0.96] shadow-[0_0_24px_-8px_rgba(34,197,94,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             Back to Home
           </button>
@@ -502,11 +503,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                   onClick={handleSaveSnapshot}
                   disabled={!code || editorReadOnly}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                    "shrink-0 px-3 py-1.5 rounded-[4px] text-sm font-medium transition-all",
                     "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                     !code || editorReadOnly
                       ? "opacity-50 cursor-not-allowed text-muted-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]"
                   )}
                   title="Save snapshot (Ctrl/Cmd + S)"
                 >
@@ -519,7 +520,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 </button>
                 <button
                   onClick={handleClearConsole}
-                  className="shrink-0 p-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  className="shrink-0 p-2 rounded-[4px] text-sm font-medium transition-all flex items-center gap-2 text-muted-foreground hover:text-destructive hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   title="Clear console"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -528,11 +529,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                   onClick={handleFormat}
                   disabled={!code || !canFormat || formatting || editorReadOnly}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                    "shrink-0 px-3 py-1.5 rounded-[4px] text-sm font-medium transition-all",
                     "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                     !code || !canFormat || formatting || editorReadOnly
                       ? "opacity-50 cursor-not-allowed text-muted-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]"
                   )}
                   title={
                     canFormat
@@ -551,11 +552,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                   onClick={handleReset}
                   disabled={!code || editorReadOnly}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                    "shrink-0 px-3 py-1.5 rounded-[4px] text-sm font-medium transition-all",
                     "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                     !code || editorReadOnly
                       ? "opacity-50 cursor-not-allowed text-muted-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]"
                   )}
                   title="Reset to default code"
                 >
@@ -568,13 +569,13 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                   disabled={!previewSupported}
                   aria-pressed={previewOpen}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                    "shrink-0 px-3 py-1.5 rounded-[4px] text-sm font-medium transition-all border",
                     "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                     !previewSupported
-                      ? "bg-muted cursor-not-allowed text-muted-foreground"
+                      ? "border-foreground/10 cursor-not-allowed text-muted-foreground opacity-50"
                       : previewOpen
-                        ? "bg-accent/20 text-foreground hover:bg-accent/30"
-                        : "bg-muted hover:bg-muted/80 text-foreground"
+                        ? "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20"
+                        : "border-foreground/10 bg-foreground/[0.04] text-muted-foreground hover:text-foreground hover:border-foreground/25"
                   )}
                   title={
                     previewSupported
@@ -586,23 +587,23 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                   <span className="hidden sm:inline">Preview</span>
                 </button>
                 {formatMsg && (
-                  <span className="shrink-0 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-full px-2.5 py-0.5 max-w-32 sm:max-w-64 truncate" title={formatMsg}>
+                  <span className="shrink-0 text-xs font-mono text-destructive bg-destructive/10 border border-destructive/20 rounded-[4px] px-2.5 py-0.5 max-w-32 sm:max-w-64 truncate" title={formatMsg}>
                     {formatMsg}
                   </span>
                 )}
                 {roomUpdateError && (
-                  <span className="shrink-0 text-xs text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-full px-2.5 py-0.5 max-w-32 sm:max-w-64 truncate" title={roomUpdateError}>
+                  <span className="shrink-0 text-xs font-mono text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-[4px] px-2.5 py-0.5 max-w-32 sm:max-w-64 truncate" title={roomUpdateError}>
                     {roomUpdateError}
                   </span>
                 )}
               </div>
 
               {/* Language info */}
-              <div className="hidden md:flex text-xs text-muted-foreground items-center gap-2 shrink-0 rounded-full border border-border bg-muted/40 px-2.5 py-1">
+              <div className="hidden md:flex text-xs text-muted-foreground items-center gap-2 shrink-0 border border-foreground/10 bg-foreground/[0.04] px-2.5 py-1 font-mono">
                 <Globe className="w-3 h-3 text-muted-foreground" />
                 {getLanguage(room.language)?.label || room.language}
                 {room.is_read_only && (
-                  <span className="text-amber-500 bg-amber-500/15 rounded-full px-2 py-px font-medium">
+                  <span className="text-amber-500 bg-amber-500/15 border border-amber-500/20 px-2 py-px">
                     {isOwner ? "Candidates read-only" : "Read-only"}
                   </span>
                 )}
