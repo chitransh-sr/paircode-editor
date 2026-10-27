@@ -8,45 +8,52 @@
 /* =====================
    Color Scheme Variables
    Premium Dark OLED (default) / Light Mode
-   Based on UI/UX Pro Max design system
+   Palette mirrors the PairCode landing page
+   (paircode-landing): near-black zinc surfaces,
+   #22C55E accent, hairline white/em borders.
    ===================== */
 
 :root {
-  /* Light mode colors */
+  /* Light mode colors — zinc mirror of the landing palette */
   color-scheme: light;
-  --color-background: #FFFFFF;
-  --color-foreground: #0F172A;
-  --color-card: #F1F5F9;
-  --color-card-foreground: #0F172A;
-  --color-muted: #E2E8F0;
-  --color-muted-foreground: #64748B;
-  --color-border: #CBD5E1;
+  --color-background: #FAFAFA;
+  --color-foreground: #18181B;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #18181B;
+  --color-muted: rgba(24, 24, 27, 0.05);
+  --color-muted-foreground: #52525B;
+  --color-border: rgba(9, 9, 11, 0.14);
   --color-accent: #22C55E;
-  --color-accent-foreground: #0F172A;
+  --color-accent-foreground: #0A0A0A;
   --color-destructive: #EF4444;
   --color-destructive-foreground: #FFFFFF;
   --color-popover: #FFFFFF;
-  --color-popover-foreground: #0F172A;
+  --color-popover-foreground: #18181B;
   --color-ring: #22C55E;
 }
 
-/* Dark mode (OLED) colors - default */
+/* Dark mode colors — exact landing-page values */
 .dark {
   color-scheme: dark;
-  --color-background: #0F172A;
-  --color-foreground: #F8FAFC;
-  --color-card: #1B2336;
-  --color-card-foreground: #F8FAFC;
-  --color-muted: #272F42;
-  --color-muted-foreground: #94A3B8;
-  --color-border: #475569;
+  --color-background: #060608;
+  --color-foreground: #F4F4F5;
+  --color-card: #0c0c11;
+  --color-card-foreground: #F4F4F5;
+  --color-muted: rgba(255, 255, 255, 0.05);
+  --color-muted-foreground: #A1A1AA;
+  --color-border: rgba(255, 255, 255, 0.13);
   --color-accent: #22C55E;
-  --color-accent-foreground: #0F172A;
+  --color-accent-foreground: #0A0A0A;
   --color-destructive: #EF4444;
-  --color-destructive-foreground: #000000;
-  --color-popover: #1B2336;
-  --color-popover-foreground: #F8FAFC;
+  --color-destructive-foreground: #FAFAFA;
+  --color-popover: #0c0c12;
+  --color-popover-foreground: #F4F4F5;
   --color-ring: #22C55E;
+}
+
+/* Easing shared with the landing page motion system */
+:root {
+  --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Prevent stray horizontal scroll on small screens (fixed overlays unaffected) */
@@ -69,11 +76,22 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--color-muted-foreground);
   border-radius: 4px;
-  transition: background 150ms ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-border);
+}
+
+/* Overlay content (modal panels): content must still scroll on short
+   screens, but the themed scrollbar never paints. SpecularButton glow
+   canvases bleed their 24px halo, which leaves a phantom 1px scroll
+   range at the modal's border — that otherwise paints a false rail. */
+.modal-scroll {
+  scrollbar-width: none;
+}
+
+.modal-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 /* Monaco editor custom theme - JetBrains Mono */
@@ -144,84 +162,165 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Premium UI upgrade — shared design utilities
-   Added on feature/premium-ui. Colors still come from the CSS
-   variables above, so light/dark themes keep working.
+   PairCode landing design system — shared surfaces & motion.
+   Ported 1:1 from paircode-landing so every screen (home, room,
+   modals, panels) speaks the same visual language.
    ═══════════════════════════════════════════════════════════════ */
 
-:root {
-  --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
-  --shadow-accent-glow: 0 10px 40px -12px rgb(34 197 94 / 0.35);
-}
-
-/* Gradient display text for hero headings / wordmark */
-.text-gradient {
-  background-image: linear-gradient(
-    100deg,
-    var(--color-foreground) 0%,
-    var(--color-foreground) 55%,
-    var(--color-accent) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Frosted glass surface (nav bars, cards sitting on the glow) */
-.glass {
-  background: color-mix(in srgb, var(--color-card) 78%, transparent);
-  backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  border: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
-}
-
-/* Dotted engineering grid for hero/section backgrounds */
-.grid-pattern {
-  background-image: radial-gradient(
-    color-mix(in srgb, var(--color-border) 70%, transparent) 1px,
-    transparent 1px
-  );
-  background-size: 26px 26px;
-}
-
-/* Accent glow for primary CTAs and icon chips */
-.glow-accent {
-  box-shadow: var(--shadow-accent-glow);
-}
-
-/* Premium motion: rise-in for hero/section content */
-@keyframes rise-in {
+/* Hero entrance choreography — elements rise with blur, staggered via --hd */
+@keyframes hero-rise {
   from {
     opacity: 0;
-    transform: translateY(18px) scale(0.985);
+    transform: translateY(26px);
+    filter: blur(8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
+    filter: blur(0);
   }
 }
-.rise-in {
-  animation: rise-in 700ms var(--ease-premium) both;
+.hero-anim {
+  opacity: 0;
+  animation: hero-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--hd, 0ms);
 }
-.rise-in-1 { animation-delay: 60ms; }
-.rise-in-2 { animation-delay: 140ms; }
-.rise-in-3 { animation-delay: 220ms; }
-.rise-in-4 { animation-delay: 320ms; }
 
-/* Slow ambient drift for background glow orbs */
-@keyframes float-slow {
+/* Scroll reveal — toggled by IntersectionObserver (.reveal → .reveal-in) */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  filter: blur(6px);
+  transition:
+    opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.reveal-in {
+  opacity: 1;
+  /* `none` (not translateY(0)) + will-change: auto — so the settled wrapper
+     stops being a containing block for fixed-position descendants (modals).
+     Identity transforms, blur(0), and will-change all break `position: fixed`. */
+  transform: none;
+  filter: none;
+  will-change: auto;
+}
+
+/* Card lift + green glow on hover */
+.card-lift {
+  transition:
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.3s ease,
+    box-shadow 0.35s ease;
+}
+.dark .card-lift:hover {
+  box-shadow:
+    0 20px 60px -15px rgba(0, 0, 0, 0.9),
+    0 0 40px -12px rgba(34, 197, 94, 0.25);
+}
+.card-lift:hover {
+  transform: translateY(-4px);
+}
+
+/* Nav link underline slide (landing header) */
+.nav-link {
+  position: relative;
+}
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 4px;
+  height: 1px;
+  background: var(--color-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+.nav-link:hover::after {
+  transform: scaleX(1);
+}
+
+/* Frosted pill nav (landing sticky header). Dark matches the landing;
+   light mirrors it. [data-scrolled] toggles the landed state. */
+.nav-pill {
+  border-radius: 16px;
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(9, 9, 11, 0.1);
+}
+.nav-pill[data-scrolled="true"] {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(34, 197, 94, 0.35);
+  box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.25);
+}
+.dark .nav-pill {
+  background: rgba(18, 18, 22, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.dark .nav-pill[data-scrolled="true"] {
+  background: rgba(10, 10, 14, 0.92);
+  border-color: rgba(34, 197, 94, 0.25);
+  box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.9);
+}
+
+/* Slow drifting orbs (ambient glow) */
+@keyframes drift {
   0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(0, -32px, 0) scale(1.06); }
+  50% { transform: translate3d(30px, -20px, 0) scale(1.08); }
 }
-.float-slow {
-  animation: float-slow 11s ease-in-out infinite;
+.animate-drift {
+  animation: drift 9s ease-in-out infinite;
 }
 
-/* Soft breathing dot for "live" badges */
-@keyframes breathe {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(0.72); opacity: 0.55; }
+/* Pulsing live dot ring */
+@keyframes ping-ring {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(2.4); opacity: 0; }
 }
-.breathe {
-  animation: breathe 2.2s ease-in-out infinite;
+.ping-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: #22c55e;
+  animation: ping-ring 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Flowing dash down the hero S-curves (landing hero rails) */
+@keyframes paircode-flow-down {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -2072.48px; }
+}
+.animate-paircode-flow {
+  animation: paircode-flow-down 4s linear infinite;
+}
+
+/* Infinite language marquee */
+@keyframes paircode-marquee-left {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-paircode-marquee {
+  animation: paircode-marquee-left 28s linear infinite;
+}
+.animate-paircode-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    will-change: auto;
+    transition: none;
+  }
+  .hero-anim {
+    opacity: 1;
+    animation: none;
+  }
 }

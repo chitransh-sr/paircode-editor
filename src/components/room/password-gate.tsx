@@ -5,6 +5,8 @@ import { Lock, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { verifyRoomPassword, isRoomOwner } from "@/hooks/use-room";
 import type { Room } from "@/types/room";
+import { Corners } from "@/components/landing-chrome";
+import SpecularCta from "@/components/specular-button/SpecularCta";
 
 interface PasswordGateProps {
   room: Room;
@@ -70,39 +72,45 @@ export function PasswordGate({ room, onUnlocked }: PasswordGateProps) {
   }
 
   return (
-    <div className="min-h-screen supports-[min-height:100dvh]:min-h-dvh bg-background flex items-center justify-center px-4 py-8">
-      <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-background to-accent/5" />
+    <div className="min-h-screen supports-[min-height:100dvh]:min-h-dvh bg-background flex items-center justify-center px-4 py-8 overflow-x-clip">
+      {/* Ambient accent glow (landing backdrop language) */}
+      <div aria-hidden className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[640px] h-[360px] bg-accent/10 blur-[130px] rounded-full animate-drift" />
+      </div>
       <div className="relative z-10 w-full max-w-md">
-        <div className="bg-card rounded-xl p-6 sm:p-8 border border-border shadow-xl">
-          {/* Header */}
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-accent/15 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-8 h-8 text-accent" />
+        <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-6 sm:p-8">
+          <Corners />
+          <div className="relative z-10">
+            {/* Header */}
+            <div className="w-12 h-12 bg-accent/15 border border-accent/20 flex items-center justify-center mb-4">
+              <Lock className="w-6 h-6 text-accent" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">
+            <p className="font-mono text-[11px] tracking-[0.2em] text-accent mb-3">{`// PRIVATE ROOM`}</p>
+            <h1 className="text-2xl font-medium tracking-tight text-foreground mb-2">
               Private Interview Room
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-[13px] text-muted-foreground leading-relaxed">
               This room is password protected. Enter the password shared by your
               interviewer to join.
             </p>
           </div>
 
           {/* Room Info */}
-          <div className="bg-muted/30 rounded-lg p-3 mb-6 border border-border">
+          <div className="relative z-10 border border-foreground/10 bg-foreground/[0.03] p-3 mt-6 mb-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">
+              <div className="min-w-0">
+                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-accent">
                   Room ID
                 </p>
-                <p className="text-sm font-mono text-foreground truncate">
+                <p className="text-sm font-mono text-foreground truncate mt-0.5">
                   {room.id}
                 </p>
               </div>
               <button
                 onClick={() => router.push("/")}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                className="p-2 hover:bg-foreground/[0.06] hover:text-foreground transition-colors text-muted-foreground shrink-0"
                 title="Back to home"
+                aria-label="Back to home"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
@@ -110,9 +118,9 @@ export function PasswordGate({ room, onUnlocked }: PasswordGateProps) {
           </div>
 
           {/* Password Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="relative z-10 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
+              <label className="block text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground/80 mb-1.5">
                 Password
               </label>
               <input
@@ -120,7 +128,7 @@ export function PasswordGate({ room, onUnlocked }: PasswordGateProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter room password"
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-base sm:text-sm text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
+                className="w-full bg-foreground/[0.04] border border-foreground/10 rounded-[4px] px-3 py-2.5 text-sm text-foreground font-mono placeholder:font-sans placeholder:text-muted-foreground/50 focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/40 transition-colors"
                 autoComplete="current-password"
                 minLength={4}
                 maxLength={128}
@@ -129,20 +137,17 @@ export function PasswordGate({ room, onUnlocked }: PasswordGateProps) {
             </div>
 
             {error && (
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-[13px] text-destructive font-mono">{error}</p>
             )}
 
-            <button
-              type="submit"
-              disabled={verifying || !password.trim()}
-              className="w-full px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <SpecularCta type="submit" className="w-full h-10" disabled={verifying || !password.trim()}>
+              <Lock className="w-4 h-4" />
               {verifying ? "Verifying..." : "Unlock Room"}
-            </button>
+            </SpecularCta>
           </form>
 
           {/* Hint */}
-          <div className="mt-6 p-3 bg-accent/5 rounded-lg border border-accent/20">
+          <div className="relative z-10 mt-6 p-3 border border-accent/20 bg-accent/5">
             <p className="text-xs text-muted-foreground text-center">
               If you do not have the password, ask the interviewer to share it.
             </p>

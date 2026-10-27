@@ -41,25 +41,29 @@ export function ThemeToggle({ theme, onChange, themes = THEMES, disabled, layout
               onClick={() => !disabled && onChange(t.value)}
               disabled={disabled}
               className={cn(
-                "rounded-xl border p-2 text-left transition-all",
+                "border p-2 text-left transition-all group",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                 active
-                  ? "border-accent bg-accent/10 ring-1 ring-accent"
-                  : "border-border hover:border-accent/50 hover:bg-muted/30",
+                  ? "border-accent bg-accent/10 ring-1 ring-accent/50"
+                  : "border-foreground/10 bg-foreground/[0.02] hover:border-accent/50 hover:bg-foreground/[0.05]",
                 disabled && "opacity-50 cursor-not-allowed"
               )}
               title={t.label}
             >
               <div
-                className="h-11 rounded-lg mb-2 flex flex-col justify-center gap-1 px-2.5 border border-black/20"
+                className={cn(
+                  "h-11 mb-2 flex flex-col justify-center gap-1 px-2.5 border border-black/20",
+                  !active && "group-hover:border-black/40",
+                  "transition-colors"
+                )}
                 style={{ backgroundColor: THEME_SWATCH[t.value] ?? "#1e1e1e" }}
               >
-                <div className="h-1 w-3/4 rounded-full bg-[#22c55e]/80" />
-                <div className="h-1 w-1/2 rounded-full bg-[#60a5fa]/80" />
-                <div className="h-1 w-2/3 rounded-full bg-[#f59e0b]/80" />
+                <div className="h-1 w-3/4 bg-[#22c55e]/80" />
+                <div className="h-1 w-1/2 bg-[#60a5fa]/80" />
+                <div className="h-1 w-2/3 bg-[#f59e0b]/80" />
               </div>
               <div className="flex items-center justify-between px-0.5">
-                <span className={cn("text-xs font-medium", active ? "text-foreground" : "text-muted-foreground")}>
+                <span className={cn("text-xs font-mono", active ? "text-accent" : "text-muted-foreground")}>
                   {t.label}
                 </span>
                 {active && <Check className="w-3.5 h-3.5 text-accent shrink-0" />}
@@ -72,21 +76,21 @@ export function ThemeToggle({ theme, onChange, themes = THEMES, disabled, layout
   }
 
   return (
-    <div className="flex items-center gap-1 bg-muted rounded-md p-1">
-      <Palette className="w-4 h-4 text-muted-foreground ml-1" />
+    <div className="flex items-center gap-1 border border-foreground/10 bg-foreground/[0.04] p-1">
+      <Palette className="w-3.5 h-3.5 text-muted-foreground ml-1 shrink-0" />
       {themes.map((t) => (
         <button
           key={t.value}
           onClick={() => !disabled && onChange(t.value)}
           disabled={disabled}
           className={cn(
-            "px-2 py-1 rounded text-xs font-medium transition-all",
+            "px-2 py-1 text-xs font-mono transition-all",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
             disabled
               ? "cursor-not-allowed opacity-50"
               : theme === t.value
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                ? "bg-accent text-accent-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]"
           )}
           title={t.label}
         >

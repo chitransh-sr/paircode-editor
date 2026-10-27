@@ -2,7 +2,6 @@
 
 import type { UserPresence } from "@/types/presence";
 import { getUserInitials } from "@/lib/presence/colors";
-import { cn } from "@/lib/utils/cn";
 
 interface PresenceBarProps {
   users?: UserPresence[];
@@ -18,12 +17,9 @@ export function PresenceBar({ users = [], currentUser }: PresenceBarProps) {
   }
 
   return (
-    <div className="inline-flex max-w-full items-center gap-2.5 rounded-full border border-border bg-card/80 py-1 pl-3 pr-2 shadow-sm backdrop-blur">
-      <span className="relative flex h-2 w-2 shrink-0">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-60" />
-        <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
-      </span>
-      <span className="text-xs text-muted-foreground whitespace-nowrap">
+    <div className="inline-flex max-w-full items-center gap-2.5 border border-foreground/10 bg-card/85 backdrop-blur px-3 py-1 shadow-sm">
+      <span className="relative w-2 h-2 rounded-full bg-accent ping-ring shrink-0" />
+      <span className="font-mono text-[11px] text-muted-foreground whitespace-nowrap tracking-wide">
         {allUsers.length} online
       </span>
 
@@ -31,7 +27,7 @@ export function PresenceBar({ users = [], currentUser }: PresenceBarProps) {
         {allUsers.slice(0, 6).map((user) => (
           <div
             key={user.id}
-            className="w-6 h-6 rounded-full ring-2 ring-card flex items-center justify-center text-[10px] font-bold text-accent-foreground"
+            className="w-6 h-6 rounded-full ring-2 ring-card flex items-center justify-center text-[10px] font-bold text-black"
             style={{ backgroundColor: user.color }}
             title={user.name}
           >
@@ -40,14 +36,14 @@ export function PresenceBar({ users = [], currentUser }: PresenceBarProps) {
         ))}
 
         {allUsers.length > 6 && (
-          <div className="h-6 px-1.5 rounded-full ring-2 ring-card bg-muted flex items-center justify-center text-[10px] font-medium text-muted-foreground">
+          <div className="h-6 px-1.5 rounded-full ring-2 ring-card bg-foreground/[0.08] flex items-center justify-center text-[10px] font-mono text-muted-foreground">
             +{allUsers.length - 6}
           </div>
         )}
       </div>
 
       {allUsers.slice(0, 3).map((user) => (
-        <span key={`name-${user.id}`} className="hidden xl:inline text-xs text-muted-foreground truncate max-w-24">
+        <span key={`name-${user.id}`} className="hidden xl:inline font-mono text-[11px] text-muted-foreground truncate max-w-24">
           {user.name}
         </span>
       ))}

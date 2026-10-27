@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, use, useRef, useId, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, AlertCircle, RefreshCw, Trash2, Check, Wand2, Eye, RotateCcw, Globe } from "lucide-react";
+import { Loader2, RefreshCw, Trash2, Check, Wand2, Eye, RotateCcw, Globe } from "lucide-react";
 import { RoomHeader } from "@/components/room/room-header";
 import { JoinModal } from "@/components/room/join-modal";
 import { PasswordGate, checkRoomAccess } from "@/components/room/password-gate";
@@ -18,6 +18,7 @@ import { useExecution } from "@/hooks/use-execution";
 import { getLanguage, FORMATTABLE_LANGUAGES, getRoomFiles } from "@/lib/execute/languages";
 import { buildPreviewHtml, stripTypeScript, previewError } from "@/lib/preview/build";
 import { getUserColor } from "@/lib/presence/colors";
+import SpecularCta from "@/components/specular-button/SpecularCta";
 import type { Room, UpdateRoomInput } from "@/types/room";
 import type { UserPresence } from "@/types/presence";
 import { cn } from "@/lib/utils/cn";
@@ -405,7 +406,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-accent mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading room...</p>
+          <p className="font-mono text-[11px] tracking-[0.2em] text-muted-foreground">loading room…</p>
         </div>
       </div>
     );
@@ -415,14 +416,12 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-          <p className="text-foreground mb-4">{error || "Room not found"}</p>
-          <button
-            onClick={() => router.push("/")}
-            className="px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
+          <p className="font-mono text-[11px] tracking-[0.2em] text-destructive mb-3">{`// ROOM ERROR`}</p>
+          <p className="text-foreground text-lg font-medium tracking-tight mb-2">{error || "Room not found"}</p>
+          <p className="text-sm text-muted-foreground mb-6">The link may be expired or incorrect.</p>
+          <SpecularCta variant="accent" size="sm" onClick={() => router.push("/")}>
             Back to Home
-          </button>
+          </SpecularCta>
         </div>
       </div>
     );
@@ -487,7 +486,10 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
           {/* Editor (left half on desktop) */}
           <div className="flex-1 min-h-[320px] lg:min-h-0 min-w-0 flex flex-col">
             <div className="bg-card px-3 py-2 border-b border-border flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 overflow-x-auto py-0.5 min-w-0">
+              {/* overflow-y-clip: overflow-x-auto computes overflow-y: auto,
+                  and the specular buttons' 24px glow-canvas bleed then adds a
+                  phantom vertical scrollbar right after the Preview chip. */}
+              <div className="flex items-center gap-2 overflow-x-auto overflow-y-clip py-0.5 min-w-0">
                 <div className="shrink-0">
                   <RunButton
                     code={code}
@@ -498,16 +500,16 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                   />
                 </div>
                 <div className="w-px h-5 bg-border shrink-0 hidden sm:block" />
-                <button
+                {/* Save/Format/Reset are labeled action CTAs: neutral specular
+                    glass, same h-8 toolbar scale as Run (the accent primary).
+                    State icons + disabled logic preserved. */}
+                <SpecularCta
+                  variant="neutral"
+                  size="sm"
+                  className="h-8 shrink-0"
+                  style={{ padding: "0 10px" }}
                   onClick={handleSaveSnapshot}
                   disabled={!code || editorReadOnly}
-                  className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-                    "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                    !code || editorReadOnly
-                      ? "opacity-50 cursor-not-allowed text-muted-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  )}
                   title="Save snapshot (Ctrl/Cmd + S)"
                 >
                   {snapshotSaved ? (
@@ -516,24 +518,21 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                     <RefreshCw className="w-4 h-4" />
                   )}
                   <span className="hidden sm:inline">{snapshotSaved ? "Saved" : "Save"}</span>
-                </button>
+                </SpecularCta>
                 <button
                   onClick={handleClearConsole}
-                  className="shrink-0 p-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  className="shrink-0 p-2 rounded-[4px] text-sm font-medium transition-all flex items-center gap-2 text-muted-foreground hover:text-destructive hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   title="Clear console"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
-                <button
+                <SpecularCta
+                  variant="neutral"
+                  size="sm"
+                  className="h-8 shrink-0"
+                  style={{ padding: "0 10px" }}
                   onClick={handleFormat}
                   disabled={!code || !canFormat || formatting || editorReadOnly}
-                  className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-                    "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                    !code || !canFormat || formatting || editorReadOnly
-                      ? "opacity-50 cursor-not-allowed text-muted-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  )}
                   title={
                     canFormat
                       ? "Format code (Ctrl/Cmd + Shift + F)"
@@ -546,35 +545,32 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                     <Wand2 className="w-4 h-4" />
                   )}
                   <span className="hidden sm:inline">Format</span>
-                </button>
-                <button
+                </SpecularCta>
+                <SpecularCta
+                  variant="neutral"
+                  size="sm"
+                  className="h-8 shrink-0"
+                  style={{ padding: "0 10px" }}
                   onClick={handleReset}
                   disabled={!code || editorReadOnly}
-                  className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-                    "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                    !code || editorReadOnly
-                      ? "opacity-50 cursor-not-allowed text-muted-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  )}
                   title="Reset to default code"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span className="hidden sm:inline">Reset</span>
-                </button>
+                </SpecularCta>
                 <div className="w-px h-5 bg-border shrink-0 hidden sm:block" />
                 <button
                   onClick={handleTogglePreview}
                   disabled={!previewSupported}
                   aria-pressed={previewOpen}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                    "shrink-0 px-3 py-1.5 rounded-[4px] text-sm font-medium transition-all border",
                     "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                     !previewSupported
-                      ? "bg-muted cursor-not-allowed text-muted-foreground"
+                      ? "border-foreground/10 cursor-not-allowed text-muted-foreground opacity-50"
                       : previewOpen
-                        ? "bg-accent/20 text-foreground hover:bg-accent/30"
-                        : "bg-muted hover:bg-muted/80 text-foreground"
+                        ? "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20"
+                        : "border-foreground/10 bg-foreground/[0.04] text-muted-foreground hover:text-foreground hover:border-foreground/25"
                   )}
                   title={
                     previewSupported
@@ -586,23 +582,23 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                   <span className="hidden sm:inline">Preview</span>
                 </button>
                 {formatMsg && (
-                  <span className="shrink-0 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-full px-2.5 py-0.5 max-w-32 sm:max-w-64 truncate" title={formatMsg}>
+                  <span className="shrink-0 text-xs font-mono text-destructive bg-destructive/10 border border-destructive/20 rounded-[4px] px-2.5 py-0.5 max-w-32 sm:max-w-64 truncate" title={formatMsg}>
                     {formatMsg}
                   </span>
                 )}
                 {roomUpdateError && (
-                  <span className="shrink-0 text-xs text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-full px-2.5 py-0.5 max-w-32 sm:max-w-64 truncate" title={roomUpdateError}>
+                  <span className="shrink-0 text-xs font-mono text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-[4px] px-2.5 py-0.5 max-w-32 sm:max-w-64 truncate" title={roomUpdateError}>
                     {roomUpdateError}
                   </span>
                 )}
               </div>
 
               {/* Language info */}
-              <div className="hidden md:flex text-xs text-muted-foreground items-center gap-2 shrink-0 rounded-full border border-border bg-muted/40 px-2.5 py-1">
+              <div className="hidden md:flex text-xs text-muted-foreground items-center gap-2 shrink-0 border border-foreground/10 bg-foreground/[0.04] px-2.5 py-1 font-mono">
                 <Globe className="w-3 h-3 text-muted-foreground" />
                 {getLanguage(room.language)?.label || room.language}
                 {room.is_read_only && (
-                  <span className="text-amber-500 bg-amber-500/15 rounded-full px-2 py-px font-medium">
+                  <span className="text-amber-500 bg-amber-500/15 border border-amber-500/20 px-2 py-px">
                     {isOwner ? "Candidates read-only" : "Read-only"}
                   </span>
                 )}

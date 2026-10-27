@@ -363,11 +363,11 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
 
   const toolButtonClass = (active: boolean) =>
     cn(
-      "shrink-0 p-2 rounded-lg transition-colors flex items-center gap-2",
+      "shrink-0 p-2 rounded-[4px] transition-colors flex items-center gap-2",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
       active
-        ? "bg-accent/20 text-foreground"
-        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+        ? "bg-accent/15 border border-accent/30 text-accent"
+        : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06] border border-transparent"
     );
 
   return (
@@ -378,13 +378,14 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
     >
       {/* Toolbar */}
       <div
-        className="shrink-0 bg-card/95 px-3 py-2 border-b border-border/80 flex items-center gap-1 overflow-x-auto"
+        className="shrink-0 bg-card/95 px-3 py-2 border-b border-border flex items-center gap-1 overflow-x-auto"
         role="toolbar"
         aria-label="Whiteboard tools"
       >
-        <span className="shrink-0 flex items-center gap-2 text-sm font-medium text-foreground pr-1">
+        <span className="shrink-0 flex items-center gap-2 font-mono text-xs text-muted-foreground pr-1">
+          <span className="w-2.5 h-2.5 rounded-full bg-accent/60 shrink-0" />
           <PenLine className="w-4 h-4 text-accent" />
-          <span className="hidden sm:inline">Whiteboard</span>
+          <span className="hidden sm:inline tracking-[0.15em] uppercase">Whiteboard</span>
         </span>
 
         <div className="w-px h-5 bg-border shrink-0 mx-1" />
@@ -455,11 +456,11 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
               aria-label={["Thin stroke", "Medium stroke", "Thick stroke"][i]}
               title={["Thin stroke", "Medium stroke", "Thick stroke"][i]}
               className={cn(
-                "p-1.5 rounded-lg flex items-center justify-center transition-colors",
+                "p-1.5 rounded-[4px] flex items-center justify-center transition-colors",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                 sizeIndex === i
-                  ? "bg-accent/20"
-                  : "hover:bg-muted"
+                  ? "bg-accent/15 text-accent"
+                  : "hover:bg-foreground/[0.06] text-muted-foreground"
               )}
             >
               <span
@@ -477,11 +478,11 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
           onClick={handleUndo}
           disabled={history.done === 0}
           className={cn(
-            "shrink-0 p-2 rounded-lg transition-colors flex items-center gap-2",
+            "shrink-0 p-2 rounded-[4px] transition-colors flex items-center gap-2",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
             history.done === 0
               ? "opacity-50 cursor-not-allowed text-muted-foreground"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]"
           )}
           title="Undo"
           aria-label="Undo"
@@ -493,11 +494,11 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
           onClick={handleRedo}
           disabled={history.undone === 0}
           className={cn(
-            "shrink-0 p-2 rounded-lg transition-colors flex items-center gap-2",
+            "shrink-0 p-2 rounded-[4px] transition-colors flex items-center gap-2",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
             history.undone === 0
               ? "opacity-50 cursor-not-allowed text-muted-foreground"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]"
           )}
           title="Redo"
           aria-label="Redo"
@@ -509,7 +510,7 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
           onClick={handleClear}
           disabled={history.done === 0}
           className={cn(
-            "shrink-0 p-2 rounded-lg transition-colors flex items-center gap-2",
+            "shrink-0 p-2 rounded-[4px] transition-colors flex items-center gap-2",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
             history.done === 0
               ? "opacity-50 cursor-not-allowed text-muted-foreground"
@@ -524,7 +525,7 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         {onClose && (
           <button
             onClick={onClose}
-            className="shrink-0 p-2 text-muted-foreground rounded-lg transition-colors hover:text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="shrink-0 p-2 text-muted-foreground rounded-[4px] transition-colors hover:text-foreground hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             title="Close whiteboard"
             aria-label="Close whiteboard"
           >
@@ -533,8 +534,8 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         )}
       </div>
 
-      {/* Canvas area: solid white board, rounded to match the app's panels */}
-      <div className="flex-1 min-h-0 mx-3 mb-3 rounded-xl border border-border overflow-hidden bg-white shadow-premium">
+      {/* Canvas area: solid white board with the app's hairline frame */}
+      <div className="flex-1 min-h-0 mx-3 mb-3 border border-foreground/10 overflow-hidden bg-white shadow-premium">
         <canvas
           ref={canvasRef}
           onPointerDown={handlePointerDown}

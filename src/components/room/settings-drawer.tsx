@@ -1,5 +1,6 @@
 'use client';
 
+import { createPortal } from "react-dom";
 import { X, Globe, Palette, Moon, Lock, Keyboard, SlidersHorizontal } from "lucide-react";
 import { LanguageSelect } from "@/components/editor/language-select";
 import { ThemeToggle } from "@/components/editor/theme-toggle";
@@ -27,9 +28,10 @@ const SHORTCUTS: { keys: string[]; action: string }[] = [
   { keys: ["F11"], action: "Fullscreen editor" },
 ];
 
+/** Square accent plate (landing icon-chip language). */
 function SectionIcon({ children }: { children: React.ReactNode }) {
   return (
-    <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">
+    <div className="w-8 h-8 bg-accent/15 border border-accent/20 flex items-center justify-center shrink-0">
       {children}
     </div>
   );
@@ -51,12 +53,15 @@ export function SettingsDrawer({
   // (view-only); the read-only flag itself stays owner-only.
   const locked = isReadOnly && !canManage;
 
-  return (
+  // Portaled to body: this drawer renders inside the room header, whose
+  // `backdrop-blur` (backdrop-filter) would otherwise become the containing
+  // block for these `fixed` layers and constrain them to the header's box.
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity",
+          "fixed inset-0 bg-black/70 backdrop-blur-sm z-50 transition-opacity",
           open ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         onClick={onClose}
@@ -66,7 +71,7 @@ export function SettingsDrawer({
       <div
         className={cn(
           "fixed inset-y-0 right-0 w-80 max-w-[calc(100vw-2rem)] sm:w-[360px] bg-card border-l border-border z-50 shadow-2xl",
-          "transform transition-transform duration-300 ease-in-out flex flex-col",
+          "transform transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col",
           open ? "translate-x-0" : "translate-x-full"
         )}
       >
@@ -77,12 +82,13 @@ export function SettingsDrawer({
               <SlidersHorizontal className="w-4 h-4 text-accent" />
             </SectionIcon>
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-semibold text-foreground leading-tight">Room Settings</h2>
+              <p className="font-mono text-[10px] tracking-[0.2em] text-accent">{`// ROOM SETTINGS`}</p>
+              <h2 className="text-lg font-medium tracking-tight text-foreground leading-tight mt-0.5">Room Settings</h2>
               <p className="text-xs text-muted-foreground">Customize this interview room</p>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 hover:bg-muted/80 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="p-1.5 hover:bg-foreground/[0.06] hover:text-foreground rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               title="Close settings"
               aria-label="Close settings"
             >
@@ -94,7 +100,7 @@ export function SettingsDrawer({
         {/* Body */}
         <div className="p-4 space-y-3 overflow-y-auto flex-1">
           {locked && (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 flex items-start gap-2.5">
+            <div className="border border-amber-500/30 bg-amber-500/10 p-3 flex items-start gap-2.5">
               <Lock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Read-only mode is on — only the interviewer can change settings.
@@ -103,7 +109,7 @@ export function SettingsDrawer({
           )}
 
           {/* Language */}
-          <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+          <div className="border border-foreground/10 bg-foreground/[0.03] p-4 space-y-3">
             <div className="flex items-center gap-2.5">
               <SectionIcon>
                 <Globe className="w-4 h-4 text-accent" />
@@ -121,7 +127,7 @@ export function SettingsDrawer({
           </div>
 
           {/* Editor theme */}
-          <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+          <div className="border border-foreground/10 bg-foreground/[0.03] p-4 space-y-3">
             <div className="flex items-center gap-2.5">
               <SectionIcon>
                 <Palette className="w-4 h-4 text-accent" />
@@ -140,7 +146,7 @@ export function SettingsDrawer({
           </div>
 
           {/* UI theme */}
-          <div className="rounded-xl border border-border bg-muted/20 p-4">
+          <div className="border border-foreground/10 bg-foreground/[0.03] p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 <SectionIcon>
@@ -158,7 +164,7 @@ export function SettingsDrawer({
           </div>
 
           {/* Read-only */}
-          <div className="rounded-xl border border-border bg-muted/20 p-4">
+          <div className="border border-foreground/10 bg-foreground/[0.03] p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 <SectionIcon>
@@ -178,15 +184,16 @@ export function SettingsDrawer({
                 onClick={() => onReadOnlyChange(!isReadOnly)}
                 className={cn(
                   "relative w-11 h-6 rounded-full transition-colors shrink-0",
+                  "border border-foreground/10",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                  isReadOnly ? "bg-accent" : "bg-muted",
+                  isReadOnly ? "bg-accent" : "bg-foreground/[0.08]",
                   !canManage && "opacity-50 cursor-not-allowed"
                 )}
               >
                 <span
                   className={cn(
                     "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform",
-                    isReadOnly && "translate-x-5"
+                    isReadOnly ? "translate-x-5" : ""
                   )}
                 />
               </button>
@@ -199,7 +206,7 @@ export function SettingsDrawer({
           </div>
 
           {/* Shortcuts */}
-          <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-2.5">
+          <div className="border border-foreground/10 bg-foreground/[0.03] p-4 space-y-2.5">
             <div className="flex items-center gap-2.5">
               <SectionIcon>
                 <Keyboard className="w-4 h-4 text-accent" />
@@ -214,7 +221,7 @@ export function SettingsDrawer({
                     {s.keys.map((k) => (
                       <kbd
                         key={k}
-                        className="px-1.5 py-0.5 rounded-md border border-border bg-background font-mono text-[11px] text-foreground"
+                        className="px-1.5 py-0.5 border border-foreground/10 bg-foreground/[0.04] font-mono text-[11px] text-foreground"
                       >
                         {k}
                       </kbd>
@@ -226,6 +233,7 @@ export function SettingsDrawer({
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }

@@ -2,7 +2,7 @@
 
 import { Loader2, Play } from "lucide-react";
 import type { ExecutionResult } from "@/types/execution";
-import { cn } from "@/lib/utils/cn";
+import SpecularCta from "@/components/specular-button/SpecularCta";
 
 interface RunButtonProps {
   code: string;
@@ -20,16 +20,14 @@ export function RunButton({ code, isExecuting, result, onExecute, disabled }: Ru
 
   return (
     <div className="flex items-center gap-2">
-      <button
-        onClick={handleClick}
+      {/* Toolbar-scale SpecularButton CTA: same fixed height as the neighboring
+          controls (h-8) with inline padding so it slots into the toolbar row. */}
+      <SpecularCta
+        size="sm"
+        className="h-8"
+        style={{ padding: "0 12px" }}
         disabled={disabled || isExecuting || !code}
-        className={cn(
-          "px-3 py-1.5 rounded-md font-medium text-sm transition-all",
-          "flex items-center gap-2",
-          disabled || isExecuting || !code
-            ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
-            : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-md hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        )}
+        onClick={handleClick}
       >
         {isExecuting ? (
           <>
@@ -38,11 +36,11 @@ export function RunButton({ code, isExecuting, result, onExecute, disabled }: Ru
           </>
         ) : (
           <>
-            <Play className="w-4 h-4" />
+            <Play className="w-4 h-4 fill-current" />
             <span className="hidden sm:inline">Run</span>
           </>
         )}
-      </button>
+      </SpecularCta>
 
       {result && <ExecutionResultBadge result={result} />}
     </div>
@@ -52,21 +50,21 @@ export function RunButton({ code, isExecuting, result, onExecute, disabled }: Ru
 function ExecutionResultBadge({ result }: { result: ExecutionResult }) {
   if (!result.success) {
     return (
-      <span className="text-xs text-destructive-foreground bg-destructive/30 px-2 py-0.5 rounded">
+      <span className="text-[11px] font-mono text-destructive bg-destructive/10 border border-destructive/20 px-2 py-0.5 rounded-[4px]">
         Error
       </span>
     );
   }
   if (result.exit_code === 0) {
     return (
-      <span className="text-xs text-accent bg-accent/20 px-2 py-0.5 rounded">
+      <span className="text-[11px] font-mono text-accent bg-accent/10 border border-accent/20 px-2 py-0.5 rounded-[4px]">
         Exit 0
       </span>
     );
   }
   if (result.exit_code) {
     return (
-      <span className="text-xs text-orange-400 bg-orange-900/30 px-2 py-0.5 rounded">
+      <span className="text-[11px] font-mono text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-[4px]">
         Exit {result.exit_code}
       </span>
     );
