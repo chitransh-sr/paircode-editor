@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { verifyRoomPassword, isRoomOwner } from "@/hooks/use-room";
 import type { Room } from "@/types/room";
 import { Corners } from "@/components/landing-chrome";
+import SpecularCta from "@/components/specular-button/SpecularCta";
 
 interface PasswordGateProps {
   room: Room;
@@ -139,14 +140,10 @@ export function PasswordGate({ room, onUnlocked }: PasswordGateProps) {
               <p className="text-[13px] text-destructive font-mono">{error}</p>
             )}
 
-            <button
-              type="submit"
-              disabled={verifying || !password.trim()}
-              className="w-full px-4 py-2.5 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-[0_0_24px_-8px_rgba(34,197,94,0.6)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <SpecularCta type="submit" className="w-full h-10" disabled={verifying || !password.trim()}>
               <Lock className="w-4 h-4" />
               {verifying ? "Verifying..." : "Unlock Room"}
-            </button>
+            </SpecularCta>
           </form>
 
           {/* Hint */}

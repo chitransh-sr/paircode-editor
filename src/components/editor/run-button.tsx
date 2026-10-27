@@ -2,7 +2,7 @@
 
 import { Loader2, Play } from "lucide-react";
 import type { ExecutionResult } from "@/types/execution";
-import { cn } from "@/lib/utils/cn";
+import SpecularCta from "@/components/specular-button/SpecularCta";
 
 interface RunButtonProps {
   code: string;
@@ -20,16 +20,14 @@ export function RunButton({ code, isExecuting, result, onExecute, disabled }: Ru
 
   return (
     <div className="flex items-center gap-2">
-      <button
-        onClick={handleClick}
+      {/* Toolbar-scale SpecularButton CTA: same fixed height as the neighboring
+          controls (h-8) with inline padding so it slots into the toolbar row. */}
+      <SpecularCta
+        size="sm"
+        className="h-8"
+        style={{ padding: "0 12px" }}
         disabled={disabled || isExecuting || !code}
-        className={cn(
-          "px-3 py-1.5 rounded-[4px] font-semibold text-sm transition-all active:scale-[0.96]",
-          "flex items-center gap-2",
-          disabled || isExecuting || !code
-            ? "opacity-50 cursor-not-allowed bg-foreground/[0.06] border border-foreground/10 text-muted-foreground"
-            : "bg-accent hover:bg-accent/90 text-accent-foreground shadow-[0_0_20px_-6px_rgba(34,197,94,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        )}
+        onClick={handleClick}
       >
         {isExecuting ? (
           <>
@@ -42,7 +40,7 @@ export function RunButton({ code, isExecuting, result, onExecute, disabled }: Ru
             <span className="hidden sm:inline">Run</span>
           </>
         )}
-      </button>
+      </SpecularCta>
 
       {result && <ExecutionResultBadge result={result} />}
     </div>

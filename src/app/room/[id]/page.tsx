@@ -18,6 +18,7 @@ import { useExecution } from "@/hooks/use-execution";
 import { getLanguage, FORMATTABLE_LANGUAGES, getRoomFiles } from "@/lib/execute/languages";
 import { buildPreviewHtml, stripTypeScript, previewError } from "@/lib/preview/build";
 import { getUserColor } from "@/lib/presence/colors";
+import SpecularCta from "@/components/specular-button/SpecularCta";
 import type { Room, UpdateRoomInput } from "@/types/room";
 import type { UserPresence } from "@/types/presence";
 import { cn } from "@/lib/utils/cn";
@@ -418,12 +419,9 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
           <p className="font-mono text-[11px] tracking-[0.2em] text-destructive mb-3">{`// ROOM ERROR`}</p>
           <p className="text-foreground text-lg font-medium tracking-tight mb-2">{error || "Room not found"}</p>
           <p className="text-sm text-muted-foreground mb-6">The link may be expired or incorrect.</p>
-          <button
-            onClick={() => router.push("/")}
-            className="px-4 py-2 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold text-sm transition-colors active:scale-[0.96] shadow-[0_0_24px_-8px_rgba(34,197,94,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
+          <SpecularCta variant="accent" size="sm" onClick={() => router.push("/")}>
             Back to Home
-          </button>
+          </SpecularCta>
         </div>
       </div>
     );
@@ -488,7 +486,10 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
           {/* Editor (left half on desktop) */}
           <div className="flex-1 min-h-[320px] lg:min-h-0 min-w-0 flex flex-col">
             <div className="bg-card px-3 py-2 border-b border-border flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 overflow-x-auto py-0.5 min-w-0">
+              {/* overflow-y-clip: overflow-x-auto computes overflow-y: auto,
+                  and the specular buttons' 24px glow-canvas bleed then adds a
+                  phantom vertical scrollbar right after the Preview chip. */}
+              <div className="flex items-center gap-2 overflow-x-auto overflow-y-clip py-0.5 min-w-0">
                 <div className="shrink-0">
                   <RunButton
                     code={code}
@@ -499,16 +500,16 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                   />
                 </div>
                 <div className="w-px h-5 bg-border shrink-0 hidden sm:block" />
-                <button
+                {/* Save/Format/Reset are labeled action CTAs: neutral specular
+                    glass, same h-8 toolbar scale as Run (the accent primary).
+                    State icons + disabled logic preserved. */}
+                <SpecularCta
+                  variant="neutral"
+                  size="sm"
+                  className="h-8 shrink-0"
+                  style={{ padding: "0 10px" }}
                   onClick={handleSaveSnapshot}
                   disabled={!code || editorReadOnly}
-                  className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-[4px] text-sm font-medium transition-all",
-                    "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                    !code || editorReadOnly
-                      ? "opacity-50 cursor-not-allowed text-muted-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]"
-                  )}
                   title="Save snapshot (Ctrl/Cmd + S)"
                 >
                   {snapshotSaved ? (
@@ -517,7 +518,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                     <RefreshCw className="w-4 h-4" />
                   )}
                   <span className="hidden sm:inline">{snapshotSaved ? "Saved" : "Save"}</span>
-                </button>
+                </SpecularCta>
                 <button
                   onClick={handleClearConsole}
                   className="shrink-0 p-2 rounded-[4px] text-sm font-medium transition-all flex items-center gap-2 text-muted-foreground hover:text-destructive hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -525,16 +526,13 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
-                <button
+                <SpecularCta
+                  variant="neutral"
+                  size="sm"
+                  className="h-8 shrink-0"
+                  style={{ padding: "0 10px" }}
                   onClick={handleFormat}
                   disabled={!code || !canFormat || formatting || editorReadOnly}
-                  className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-[4px] text-sm font-medium transition-all",
-                    "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                    !code || !canFormat || formatting || editorReadOnly
-                      ? "opacity-50 cursor-not-allowed text-muted-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]"
-                  )}
                   title={
                     canFormat
                       ? "Format code (Ctrl/Cmd + Shift + F)"
@@ -547,22 +545,19 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
                     <Wand2 className="w-4 h-4" />
                   )}
                   <span className="hidden sm:inline">Format</span>
-                </button>
-                <button
+                </SpecularCta>
+                <SpecularCta
+                  variant="neutral"
+                  size="sm"
+                  className="h-8 shrink-0"
+                  style={{ padding: "0 10px" }}
                   onClick={handleReset}
                   disabled={!code || editorReadOnly}
-                  className={cn(
-                    "shrink-0 px-3 py-1.5 rounded-[4px] text-sm font-medium transition-all",
-                    "flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                    !code || editorReadOnly
-                      ? "opacity-50 cursor-not-allowed text-muted-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]"
-                  )}
                   title="Reset to default code"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span className="hidden sm:inline">Reset</span>
-                </button>
+                </SpecularCta>
                 <div className="w-px h-5 bg-border shrink-0 hidden sm:block" />
                 <button
                   onClick={handleTogglePreview}

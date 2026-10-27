@@ -1,13 +1,12 @@
 'use client';
 
-import type { ReactNode } from "react";
-import type { MouseEventHandler } from "react";
-import { cn } from "@/lib/utils/cn";
-
 /* ═══════════════════════════════════════════════════════════════
-   PairCode landing chrome — shared brand marks, corner brackets,
-   hero decor and the signature swipe-fill button, ported from the
-   landing page so the editor speaks the same visual language.
+   PairCode landing chrome — shared brand marks, corner brackets
+   and hero decor, ported from the landing page so the editor
+   speaks the same visual language.
+   CTA chrome lives in components/specular-button: <SpecularCta/>
+   themes the React Bits <SpecularButton/> per theme/variant and is
+   the single button system for every call-to-action.
    ═══════════════════════════════════════════════════════════════ */
 
 export const ACCENT = "#22C55E";
@@ -45,61 +44,89 @@ export function Corners({ className = "" }: { className?: string }) {
   );
 }
 
-/** Isometric grid + hatch backdrop with top fade (landing hero). */
+/** Isometric grid + hatch backdrop with top fade (landing hero).
+    Theme-aware: the white-alpha set reads on the dark canvas, and a
+    carbon/zinc-alpha twin covers the light canvas — same geometry. */
 export function IsoGrid() {
+  const mask = "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.45) 120px, rgba(0,0,0,0.2) 260px, rgba(0,0,0,0.06) 440px, transparent 640px)";
+  const iso = (variant: "dark" | "light") => {
+    const s = variant === "dark"
+      ? { f1: "rgba(255,255,255,0.02)", f2: "rgba(255,255,255,0.008)", f3: "rgba(255,255,255,0.015)", k1: "rgba(255,255,255,0.07)", k2: "rgba(255,255,255,0.05)", k3: "rgba(255,255,255,0.06)", hatch: "rgba(255,255,255,0.04)", svg: "w-full h-full opacity-30" }
+      : { f1: "rgba(9,9,11,0.016)", f2: "rgba(9,9,11,0.006)", f3: "rgba(9,9,11,0.012)", k1: "rgba(9,9,11,0.085)", k2: "rgba(9,9,11,0.05)", k3: "rgba(9,9,11,0.07)", hatch: "rgba(9,9,11,0.045)", svg: "w-full h-full opacity-40" };
+    const id = `pc-iso-${variant}`;
+    return (
+      <svg
+        className={`${s.svg} ${variant === "dark" ? "dark:block hidden" : "block dark:hidden"}`}
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <defs>
+          <pattern id={id} width="120" height="69.282" patternUnits="userSpaceOnUse">
+            <g transform="translate(30, 17.32)">
+              <polygon points="0,-17.32 30,0 0,17.32 -30,0" fill={s.f1} stroke={s.k1} strokeWidth="0.8" />
+              <polygon points="-30,0 0,17.32 0,51.96 -30,34.64" fill={s.f2} stroke={s.k2} strokeWidth="0.8" />
+              <polygon points="0,17.32 30,0 30,34.64 0,51.96" fill={s.f3} stroke={s.k3} strokeWidth="0.8" />
+            </g>
+            <g transform="translate(90, 51.96)">
+              <polygon points="0,-17.32 30,0 0,17.32 -30,0" fill={s.f1} stroke={s.k1} strokeWidth="0.8" />
+              <polygon points="-30,0 0,17.32 0,51.96 -30,34.64" fill={s.f2} stroke={s.k2} strokeWidth="0.8" />
+              <polygon points="0,17.32 30,0 30,34.64 0,51.96" fill={s.f3} stroke={s.k3} strokeWidth="0.8" />
+            </g>
+          </pattern>
+          <pattern id={`pc-hatch-${variant}`} width="28" height="28" patternUnits="userSpaceOnUse">
+            <path d="M-1,5 L5,-1 M-1,19 L19,-1 M-1,33 L33,-1 M9,33 L33,9 M23,33 L33,23" fill="none" stroke={s.hatch} strokeWidth="0.8" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill={`url(#${id})`} />
+        <rect width="100%" height="100%" fill={`url(#pc-hatch-${variant})`} opacity="0.3" />
+      </svg>
+    );
+  };
   return (
     <div
       className="absolute top-0 inset-x-0 w-full h-[700px] pointer-events-none select-none overflow-hidden"
-      style={{
-        maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.45) 120px, rgba(0,0,0,0.2) 260px, rgba(0,0,0,0.06) 440px, transparent 640px)",
-        WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.45) 120px, rgba(0,0,0,0.2) 260px, rgba(0,0,0,0.06) 440px, transparent 640px)",
-      }}
+      style={{ maskImage: mask, WebkitMaskImage: mask }}
     >
-      <svg className="w-full h-full dark:opacity-30 opacity-[0.12]" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="pc-iso" width="120" height="69.282" patternUnits="userSpaceOnUse">
-            <g transform="translate(30, 17.32)">
-              <polygon points="0,-17.32 30,0 0,17.32 -30,0" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.07)" strokeWidth="0.8" />
-              <polygon points="-30,0 0,17.32 0,51.96 -30,34.64" fill="rgba(255,255,255,0.008)" stroke="rgba(255,255,255,0.05)" strokeWidth="0.8" />
-              <polygon points="0,17.32 30,0 30,34.64 0,51.96" fill="rgba(255,255,255,0.015)" stroke="rgba(255,255,255,0.06)" strokeWidth="0.8" />
-            </g>
-            <g transform="translate(90, 51.96)">
-              <polygon points="0,-17.32 30,0 0,17.32 -30,0" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.07)" strokeWidth="0.8" />
-              <polygon points="-30,0 0,17.32 0,51.96 -30,34.64" fill="rgba(255,255,255,0.008)" stroke="rgba(255,255,255,0.05)" strokeWidth="0.8" />
-              <polygon points="0,17.32 30,0 30,34.64 0,51.96" fill="rgba(255,255,255,0.015)" stroke="rgba(255,255,255,0.06)" strokeWidth="0.8" />
-            </g>
-          </pattern>
-          <pattern id="pc-hatch" width="28" height="28" patternUnits="userSpaceOnUse">
-            <path d="M-1,5 L5,-1 M-1,19 L19,-1 M-1,33 L33,-1 M9,33 L33,9 M23,33 L33,23" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="0.8" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#pc-iso)" />
-        <rect width="100%" height="100%" fill="url(#pc-hatch)" opacity="0.3" />
-      </svg>
+      {iso("dark")}
+      {iso("light")}
     </div>
   );
 }
 
-/** Twin S-curves with a flowing dash of light (landing hero rails). */
+/** Twin S-curves with a flowing dash of light (landing hero rails).
+    Dark rails use the landing white-green alpha set; light mode gets a
+    slightly deeper green so the rails don't wash out on the zinc-50
+    canvas — same geometry drawn twice, toggled by the `.dark` class. */
 export function FlowLines() {
   const d = "M 138.5 0 L 138.5 373.523 C 138.5 422.622 112.031 467.907 69.25 492 L 69.25 492 C 26.469 516.093 0 561.378 0 610.477 L 0 985.5";
+  const strokeSet = (variant: "dark" | "light") => {
+    const [rail, dash, shadow] = variant === "dark"
+      ? ["rgba(34,197,94,0.07)", "rgba(34,197,94,0.55)", "drop-shadow(0 0 1.5px rgba(34,197,94,0.45))"]
+      : ["rgba(34,197,94,0.12)", "rgba(34,197,94,0.65)", "drop-shadow(0 0 1.5px rgba(34,197,94,0.5))"];
+    return (
+      <g className={variant === "dark" ? "dark:block hidden" : "block dark:hidden"}>
+        <path d={d} fill="none" stroke={rail} strokeWidth="0.8" strokeLinecap="butt" />
+        <path
+          d={d}
+          fill="none"
+          stroke={dash}
+          strokeWidth="1"
+          strokeLinecap="round"
+          strokeDasharray="1036.24 1036.24"
+          className="animate-paircode-flow"
+          style={{ filter: shadow }}
+        />
+      </g>
+    );
+  };
   const rail = (mirror: boolean, offsets: number[]) => (
     <>
       {offsets.map((top) => (
         <div key={top} className="absolute w-[151px] h-[986px] pointer-events-none select-none overflow-visible" style={{ top }}>
           <svg className="w-full h-full overflow-visible" viewBox="0 0 151 986" fill="none" role="presentation">
             <g transform={mirror ? "translate(151, 0) scale(-1, 1)" : undefined}>
-              <path d={d} fill="none" stroke="rgba(34,197,94,0.07)" strokeWidth="0.8" strokeLinecap="butt" />
-              <path
-                d={d}
-                fill="none"
-                stroke="rgba(34,197,94,0.55)"
-                strokeWidth="1"
-                strokeLinecap="round"
-                strokeDasharray="1036.24 1036.24"
-                className="animate-paircode-flow"
-                style={{ filter: "drop-shadow(0 0 1.5px rgba(34,197,94,0.45))" }}
-              />
+              {strokeSet("dark")}
+              {strokeSet("light")}
             </g>
           </svg>
         </div>
@@ -117,150 +144,5 @@ export function FlowLines() {
       <div className="absolute top-0 bottom-0 left-[4px] w-[151px]">{rail(true, [0, 56, 112])}</div>
       <div className="absolute top-0 bottom-0 left-[859px] w-[151px]">{rail(false, [0, 56, 112])}</div>
     </div>
-  );
-}
-
-/* ── Signature landing button: chip that fills from the left icon
-   plate to full width on hover, label flipping to the fill's contrast
-   tone. Tones are tokenized so BOTH light and dark modes stay legible:
-   - accent fill stays green in both modes → black icon/label flip.
-   - foreground fill is near-white in dark / near-black in light →
-     the icon always reads `text-background` (black-on-white / white-on-zinc).
-   ── */
-
-type FillVariant = "accent" | "white";
-
-interface FillBaseProps {
-  label: string;
-  /** The icon drawn on the leading 36px plate (black-on-fill). */
-  icon: ReactNode;
-  /** Trailing arrow (from the landing hero CTAs). */
-  arrow?: boolean;
-  variant?: FillVariant;
-  /** sm = dashboard-card / modal scale, md = hero scale. */
-  size?: "sm" | "md";
-  className?: string;
-  disabled?: boolean;
-}
-
-/** Chip shell — shared by hero CTAs and the dashboard card CTAs. */
-export function chipClasses(variant: FillVariant) {
-  // Surface/border tone matches the landing (`bg-[#0c0c10]`, `border-white/20
-  // hover:border-white`) in dark and translates to zinc tokens in light mode.
-  return cn(
-    "group relative inline-flex items-center justify-between p-1",
-    "bg-foreground/[0.035] border border-foreground/20 hover:border-foreground/70",
-    "transition-all duration-300 active:scale-[0.98] cursor-pointer",
-    variant === "accent" ? "shadow-lg" : "shadow-sm"
-  );
-}
-
-/** The swipe sweep. Explicit width transition + will-change = buttery tween. */
-export function sweepClasses(variant: FillVariant, size: "sm" | "md") {
-  return cn(
-    "absolute inset-y-1 left-1 pointer-events-none will-change-[width]",
-    size === "sm" ? "w-8" : "w-9",
-    "transition-[width] duration-[450ms] ease-[cubic-bezier(0.16,1,0.3,1)]",
-    "group-hover:w-[calc(100%-8px)]",
-    variant === "accent" ? "bg-accent" : "bg-foreground"
-  );
-}
-
-/** Icon plate tone — must always contrast the resting fill beneath it. */
-export function iconClasses(variant: FillVariant, size: "sm" | "md") {
-  return cn(
-    size === "sm" ? "w-8 h-8" : "w-9 h-9",
-    "flex items-center justify-center shrink-0 transition-colors duration-300",
-    variant === "accent" ? "text-black" : "text-background"
-  );
-}
-
-/** Label tone — tokenized so day mode doesn't render white-on-white. */
-export function labelClasses(variant: FillVariant, size: "sm" | "md") {
-  return cn(
-    "transition-colors duration-300",
-    size === "sm" ? "text-sm font-semibold tracking-wide" : "text-[15px] font-semibold",
-    variant === "accent"
-      ? "text-foreground group-hover:text-black"
-      : "text-foreground group-hover:text-background"
-  );
-}
-
-/** Trailing arrow tone. */
-export function arrowClasses(variant: FillVariant) {
-  return cn(
-    "pl-3",
-    variant === "accent"
-      ? "text-foreground/50 group-hover:text-black"
-      : "text-foreground/40 group-hover:text-background",
-    "group-hover:translate-x-1 transition-all duration-300"
-  );
-}
-
-export function FillButton({ label, icon, arrow = true, variant = "accent", size = "md", className, disabled, onClick, type }: FillBaseProps & { onClick?: MouseEventHandler<HTMLButtonElement>; type?: "button" | "submit" }) {
-  return (
-    <button
-      type={type ?? "button"}
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      className={cn(
-        chipClasses(variant),
-        disabled && "opacity-50 pointer-events-none cursor-not-allowed",
-        arrow ? "pr-4" : "pr-3",
-        size === "sm" ? "w-full" : "w-full sm:w-auto",
-        className
-      )}
-    >
-      <Corners />
-      <span className={sweepClasses(variant, size)} />
-      <span className="relative z-10 flex items-center gap-3">
-        <span className={iconClasses(variant, size)}>
-          {icon}
-        </span>
-        <span className={labelClasses(variant, size)}>
-          {label}
-        </span>
-      </span>
-      {arrow && (
-        <span className={cn("relative z-10", arrowClasses(variant))}>
-          →
-        </span>
-      )}
-    </button>
-  );
-}
-
-/** Anchor twin of FillButton (landing hero CTAs semantics). */
-export function FillLink({ label, icon, arrow = true, variant = "accent", size = "md", className, href, target, rel, onClick }: FillBaseProps & { href: string; target?: string; rel?: string; onClick?: MouseEventHandler<HTMLAnchorElement> }) {
-  return (
-    <a
-      href={href}
-      target={target}
-      rel={rel}
-      onClick={onClick}
-      className={cn(
-        chipClasses(variant),
-        arrow ? "pr-4" : "pr-3",
-        size === "sm" ? "w-full" : "w-full sm:w-auto",
-        className
-      )}
-    >
-      <Corners />
-      <span className={sweepClasses(variant, size)} />
-      <span className="relative z-10 flex items-center gap-3">
-        <span className={iconClasses(variant, size)}>
-          {icon}
-        </span>
-        <span className={labelClasses(variant, size)}>
-          {label}
-        </span>
-      </span>
-      {arrow && (
-        <span className={cn("relative z-10", arrowClasses(variant))}>
-          →
-        </span>
-      )}
-    </a>
   );
 }

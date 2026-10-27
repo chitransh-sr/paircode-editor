@@ -7,7 +7,8 @@ import type { Room } from "@/types/room";
 import { createRoom, verifyRoomPassword, sanitizeStoredName } from "@/hooks/use-room";
 import { LANGUAGES, getLanguage } from "@/lib/execute/languages";
 import { cn } from "@/lib/utils/cn";
-import { Corners, chipClasses, sweepClasses, iconClasses, labelClasses, arrowClasses } from "@/components/landing-chrome";
+import { Corners } from "@/components/landing-chrome";
+import SpecularCta from "@/components/specular-button/SpecularCta";
 
 interface RoomDashboardProps {
   onCreateRoom: (room: Room) => void;
@@ -59,33 +60,9 @@ function parseRoomId(input: string): string | null {
   return null;
 }
 
-/** Landing-style inline swipe-fill CTA (span — used inside card <button>s).
-    Shares its chrome with the hero CTAs (chipClasses/sweep/icon/label/arrow)
-    so both stay pixel-consistent and theme-legal. pointer-events-none routes
-    hover to the parent role card — the landing-lobby behavior (hovering the
-    card fills its CTA) — while the card's own onClick handles activation. */
-function CardCta({ icon, label, variant }: { icon: React.ReactNode; label: string; variant: "accent" | "white" }) {
-  return (
-    <span
-      className={cn(
-        chipClasses(variant),
-        "mt-1 w-fit pointer-events-none"
-      )}
-    >
-      <Corners />
-      <span className={sweepClasses(variant, "sm")} />
-      <span className="relative z-10 flex items-center gap-2.5">
-        <span className={iconClasses(variant, "sm")}>
-          {icon}
-        </span>
-        <span className={labelClasses(variant, "sm")}>
-          {label}
-        </span>
-      </span>
-      <span className={cn("relative z-10", arrowClasses(variant))}>→</span>
-    </span>
-  );
-}
+/* The card CTAs are real <SpecularCta/> <button>s now (stage 1 kept a span
+   inside a card <button>, which is invalid nesting — a real button can't
+   nest inside a button). */
 
 export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -347,9 +324,20 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
           <p className="text-[15px] text-muted-foreground">Pick your seat — the room handles the rest.</p>
         </div>
         <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-10 sm:mb-14">
-          <button
+          {/* Role cards are keyboard-operable hosts: a real <button> can't nest
+              inside a <button>, so the card is a div[role=button] (+ Enter/Space)
+              while the CTA is an actual SpecularButton that stops propagation. */}
+          <div
+            role="button"
+            tabIndex={0}
             onClick={() => setShowCreateModal(true)}
-            className="group text-left bg-card border border-border hover:border-accent/40 card-lift p-6 sm:p-7 flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            onKeyDown={(e) => {
+              if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+                e.preventDefault();
+                setShowCreateModal(true);
+              }
+            }}
+            className="group text-left cursor-pointer bg-card border border-border hover:border-accent/40 card-lift p-6 sm:p-7 flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <Corners />
             <div className="w-10 h-10 bg-accent/15 border border-accent/20 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-300">
@@ -360,16 +348,36 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
               Create a room, pick a language, and share the link with your candidate.
             </p>
             <div className="mt-auto">
-              <CardCta icon={<Plus className="w-4 h-4" />} label="Create Interview Room" variant="accent" />
+              <SpecularCta
+                variant="accent"
+                size="sm"
+                className="w-full"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowCreateModal(true);
+                }}
+              >
+                <Plus className="w-4 h-4" />
+                Create Interview Room
+              </SpecularCta>
             </div>
-          </button>
+          </div>
 
-          <button
+          <div
+            role="button"
+            tabIndex={0}
             onClick={() => {
               setJoinName(readStoredName());
               setShowJoinModal(true);
             }}
-            className="group text-left bg-card border border-border hover:border-accent/40 card-lift p-6 sm:p-7 flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            onKeyDown={(e) => {
+              if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+                e.preventDefault();
+                setJoinName(readStoredName());
+                setShowJoinModal(true);
+              }
+            }}
+            className="group text-left cursor-pointer bg-card border border-border hover:border-accent/40 card-lift p-6 sm:p-7 flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <Corners />
             <div className="w-10 h-10 bg-accent/15 border border-accent/20 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-300">
@@ -380,9 +388,21 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
               Have an interview link? Paste it below to join your interview room.
             </p>
             <div className="mt-auto">
-              <CardCta icon={<Link2 className="w-4 h-4" />} label="Join with a Link" variant="white" />
+              <SpecularCta
+                variant="neutral"
+                size="sm"
+                className="w-full"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setJoinName(readStoredName());
+                  setShowJoinModal(true);
+                }}
+              >
+                <Link2 className="w-4 h-4" />
+                Join with a Link
+              </SpecularCta>
             </div>
-          </button>
+          </div>
         </div>
 
         {/* Recent rooms — suppressed until after first mount to avoid SSR/client mismatch */}
@@ -412,12 +432,15 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                       {getLanguage(room.language)?.label || room.language}
                     </span>
                   </div>
-                  <button
+                  <SpecularCta
+                    variant="neutral"
+                    size="sm"
+                    className="shrink-0 ml-3 h-7 font-mono text-xs"
+                    style={{ padding: "0 10px" }}
                     onClick={() => handleRecentJoin(room)}
-                    className="shrink-0 ml-3 inline-flex items-center gap-2 px-3 py-1.5 text-xs border border-foreground/15 text-muted-foreground hover:border-foreground/40 hover:text-foreground font-mono transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   >
                     Join →
-                  </button>
+                  </SpecularCta>
                 </div>
               ))}
             </div>
@@ -436,7 +459,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
             onClick={closeModals}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-5 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto"
+            <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-5 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto modal-scroll"
               onClick={(e) => e.stopPropagation()}
             >
               <Corners />
@@ -528,19 +551,15 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     >
                       Cancel
                     </button>
-                    <button
-                      onClick={handleCreateRoom}
+                    <SpecularCta
+                      size="sm"
+                      className="flex-1 h-10"
                       disabled={creating || !roomName.trim()}
-                      className={cn(
-                        "flex-1 px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
-                        creating || !roomName.trim()
-                          ? "bg-foreground/[0.06] text-muted-foreground border border-foreground/10 cursor-not-allowed"
-                          : "bg-accent text-accent-foreground hover:bg-accent/90 font-semibold shadow-[0_0_24px_-8px_rgba(34,197,94,0.6)]"
-                      )}
+                      onClick={handleCreateRoom}
                     >
                       {creating && <Loader2 className="w-4 h-4 animate-spin" />}
                       {creating ? "Creating..." : "Create Room"}
-                    </button>
+                    </SpecularCta>
                   </div>
                 </div>
               </div>
@@ -556,7 +575,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
         <div>
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" onClick={closeModals} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-5 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto"
+            <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-5 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto modal-scroll"
               onClick={(e) => e.stopPropagation()}
             >
               <Corners />
@@ -605,19 +624,15 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     >
                       Back
                     </button>
-                    <button
-                      onClick={handlePasswordSubmit}
+                    <SpecularCta
+                      size="sm"
+                      className="flex-1 h-10"
                       disabled={!joinPassword.trim()}
-                      className={cn(
-                        "flex-1 px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
-                        !joinPassword.trim()
-                          ? "bg-foreground/[0.06] text-muted-foreground border border-foreground/10 cursor-not-allowed"
-                          : "bg-accent text-accent-foreground hover:bg-accent/90 font-semibold shadow-[0_0_24px_-8px_rgba(34,197,94,0.6)]"
-                      )}
+                      onClick={handlePasswordSubmit}
                     >
                       <Lock className="w-4 h-4" />
                       Unlock Room
-                    </button>
+                    </SpecularCta>
                   </div>
                 </div>
               </div>
@@ -636,7 +651,7 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
             onClick={closeModals}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-5 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto"
+            <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-5 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto modal-scroll"
               onClick={(e) => e.stopPropagation()}
             >
               <Corners />
@@ -692,19 +707,15 @@ export function RoomDashboard({ onCreateRoom, onJoinRoom }: RoomDashboardProps) 
                     >
                       Cancel
                     </button>
-                    <button
-                      onClick={handleJoinRoom}
+                    <SpecularCta
+                      size="sm"
+                      className="flex-1 h-10"
                       disabled={!joinInput.trim()}
-                      className={cn(
-                        "flex-1 px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
-                        !joinInput.trim()
-                          ? "bg-foreground/[0.06] text-muted-foreground border border-foreground/10 cursor-not-allowed"
-                          : "bg-accent text-accent-foreground hover:bg-accent/90 font-semibold shadow-[0_0_24px_-8px_rgba(34,197,94,0.6)]"
-                      )}
+                      onClick={handleJoinRoom}
                     >
                       <Link2 className="w-4 h-4" />
                       Join Room
-                    </button>
+                    </SpecularCta>
                   </div>
                 </div>
               </div>

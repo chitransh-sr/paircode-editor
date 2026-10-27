@@ -18,9 +18,9 @@ import {
   GithubMark,
   IsoGrid,
   PairMark,
-  FillLink,
   FlowLines,
 } from "@/components/landing-chrome";
+import SpecularCta from "@/components/specular-button/SpecularCta";
 import { ModeToggle } from "@/components/editor/mode-toggle";
 import { LANGUAGES } from "@/lib/execute/languages";
 
@@ -65,36 +65,74 @@ export default function HomePage() {
     router.push(`/room/${roomId}`);
   };
 
-  // Cursor-follow hero glow (landing hero choreography).
-  const heroRef = useRef<HTMLElement>(null);
+  // SpecularButton CTAs are real <button>s; the old anchor jumps are
+  // preserved via scrollIntoView. behavior:"auto" defers to the CSS
+  // scroll-behavior (smooth, with the reduced-motion override in globals).
+  const scrollToDashboard = () => {
+    document.getElementById("dashboard")?.scrollIntoView({ behavior: "auto", block: "start" });
+  };
+
+  // Page-wide cursor glow (landing hero choreography, promoted from the
+  // hero section to the full page so the light follows the mouse
+  // everywhere). Viewport coordinates drive a fixed glow layer; writes
+  // are rAF-throttled and only enabled for fine pointers.
+  const rootRef = useRef<HTMLDivElement>(null);
   const glowRaf = useRef(0);
   const [glowOn, setGlowOn] = useState(false);
 
-  const onHeroMouseMove = (e: React.MouseEvent) => {
+  useEffect(() => {
     if (!window.matchMedia("(pointer: fine)").matches) return;
-    const el = heroRef.current;
-    if (!el) return;
-    cancelAnimationFrame(glowRaf.current);
-    const rect = el.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    glowRaf.current = requestAnimationFrame(() => {
-      el.style.setProperty("--mx", `${x}px`);
-      el.style.setProperty("--my", `${y}px`);
-      setGlowOn(true);
-    });
-  };
-
-  useEffect(() => () => cancelAnimationFrame(glowRaf.current), []);
+    const onMove = (e: MouseEvent) => {
+      const el = rootRef.current;
+      if (!el) return;
+      cancelAnimationFrame(glowRaf.current);
+      glowRaf.current = requestAnimationFrame(() => {
+        el.style.setProperty("--mx", `${e.clientX}px`);
+        el.style.setProperty("--my", `${e.clientY}px`);
+        setGlowOn(true);
+      });
+    };
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      cancelAnimationFrame(glowRaf.current);
+    };
+  }, []);
 
   const marqueeLanguages = LANGUAGES.filter((lang) => !lang.hidden).map(
     (lang) => lang.label
   );
 
   return (
-    <div className="w-full max-w-[1536px] mx-auto relative min-h-dvh flex flex-col overflow-x-clip bg-background text-foreground selection:bg-accent/20 selection:text-foreground">
-      {/* Radial vignette (landing backdrop) */}
-      <div className="pointer-events-none fixed inset-0 hidden dark:block bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(6,6,8,0.5)_65%,#060608_100%)] z-0" />
+    <div
+      ref={rootRef}
+      className="w-full max-w-[1536px] mx-auto relative min-h-dvh flex flex-col overflow-x-clip bg-background text-foreground selection:bg-accent/20 selection:text-foreground"
+    >
+      {/* ── Page backdrop (full-page hero bg): radial vignette + iso grid +
+          cursor-follow glow. Fixed on the viewport because --mx/--my are
+          set from clientX/clientY in the mousemove effect above. The grid
+          and light now track the cursor across the whole page, not just
+          the hero — dark-only vignette kept as-is. */}
+      <div className="pointer-events-none fixed inset-0 z-0 select-none">
+        <div className="absolute inset-0 hidden dark:block bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(6,6,8,0.5)_65%,#060608_100%)]" />
+        <IsoGrid />
+        {/* Cursor-follow glow — tuned per theme: the day canvas only needs
+            ~0.06 alpha to read premium; night keeps the original wash. */}
+        <div
+          className="pointer-events-none absolute inset-0 transition-opacity duration-500 dark:hidden"
+          style={{
+            opacity: glowOn ? 1 : 0,
+            background: "radial-gradient(480px circle at var(--mx, 50%) var(--my, 30%), rgba(34,197,94,0.06), transparent 62%)",
+          }}
+        />
+        <div
+          className="pointer-events-none absolute inset-0 transition-opacity duration-500 hidden dark:block"
+          style={{
+            opacity: glowOn ? 1 : 0,
+            background: "radial-gradient(480px circle at var(--mx, 50%) var(--my, 30%), rgba(34,197,94,0.09), transparent 65%)",
+          }}
+        />
+      </div>
 
       {/* ── Sticky pill nav ─── */}
       <header className="sticky top-0 z-50 w-full px-4 pt-3">
@@ -119,46 +157,33 @@ export default function HomePage() {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <ModeToggle />
-              <a
-                href={REPO_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="group relative flex items-center gap-1.5 px-3 py-2 h-9 bg-foreground/[0.05] border border-foreground/20 hover:border-foreground/40 text-sm font-medium text-foreground transition-all cursor-pointer shrink-0"
+              <SpecularCta
+                variant="neutral"
+                size="sm"
+                className="h-9 shrink-0"
+                onClick={() => window.open(REPO_URL, "_blank", "noopener,noreferrer")}
               >
-                <Corners />
                 <GithubMark className="w-4 h-4" />
                 <span className="hidden min-[400px]:inline">Star</span>
-              </a>
-              <a
-                href="#dashboard"
-                className="group relative hidden sm:flex items-center gap-1.5 px-3.5 py-2 h-9 bg-foreground hover:bg-foreground/90 text-background text-sm font-semibold transition-all active:scale-95 cursor-pointer shrink-0"
-              >
-                <Corners />
+              </SpecularCta>
+              <SpecularCta variant="accent" size="sm" className="hidden h-9 sm:flex" onClick={scrollToDashboard}>
                 <Plus className="w-4 h-4 shrink-0" />
-                <span>New Room</span>
-              </a>
+                New Room
+              </SpecularCta>
             </div>
           </div>
         </nav>
       </header>
 
       {/* ── Product hero: compact, leads straight into the workspace ───── */}
+      {/* Hero keeps only its signature flow rails; the grid + cursor glow
+          were promoted to the fixed page backdrop above (full-page bg). */}
       <section
         id="top"
-        ref={heroRef}
-        onMouseMove={onHeroMouseMove}
         className="relative flex flex-col items-center justify-center text-center w-full pt-12 sm:pt-16 pb-4 sm:pb-6 overflow-visible"
       >
         <div className="pointer-events-none absolute inset-0 z-0 overflow-visible select-none">
-          <IsoGrid />
           <FlowLines />
-          <div
-            className="absolute inset-0 opacity-0 transition-opacity duration-500"
-            style={{
-              opacity: glowOn ? 1 : 0,
-              background: "radial-gradient(480px circle at var(--mx, 50%) var(--my, 30%), rgba(34,197,94,0.09), transparent 65%)",
-            }}
-          />
         </div>
 
         <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-5xl mx-auto px-4">
@@ -189,8 +214,14 @@ export default function HomePage() {
             className="hero-anim relative z-10 flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full sm:w-auto"
             style={{ ["--hd" as string]: "420ms" }}
           >
-            <FillLink href="#dashboard" label="Create a room" variant="accent" className="sm:w-auto" icon={<Play className="w-[18px] h-[18px] fill-current" />} />
-            <FillLink href="#dashboard" label="Join with a link" variant="white" icon={<Link2 className="w-5 h-5" />} />
+            <SpecularCta variant="accent" autoAnimate className="w-full sm:w-auto" onClick={scrollToDashboard}>
+              <Play className="w-[18px] h-[18px] fill-current" />
+              Create a room
+            </SpecularCta>
+            <SpecularCta variant="neutral" className="w-full sm:w-auto" onClick={scrollToDashboard}>
+              <Link2 className="w-[18px] h-[18px]" />
+              Join with a link
+            </SpecularCta>
           </div>
 
           {/* Product spec bar */}

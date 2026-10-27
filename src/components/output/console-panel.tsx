@@ -5,6 +5,7 @@ import { Terminal, Send, Trash2, Info, ChevronDown, ChevronUp } from "lucide-rea
 import type { ExecutionResult } from "@/types/execution";
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils/cn";
+import SpecularCta from "@/components/specular-button/SpecularCta";
 
 interface ConsolePanelProps {
   result: ExecutionResult | null;
@@ -174,9 +175,11 @@ export function ConsolePanel({ result, onStdinSubmit, waitingForInput, onClear }
         )}
       </div>
 
-      {/* STDIN input when waiting */}
+      {/* STDIN input when waiting. overflow-clip: the Send specular's 24px
+          glow bleed would add a phantom ~16px scroll range to the room's
+          overflow-y-auto split container on mobile. */}
       {waitingForInput && !collapsed && (
-        <div className="border-t border-border px-3 py-2 bg-background shrink-0">
+        <div className="border-t border-border px-3 py-2 bg-background shrink-0 overflow-clip">
           <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mb-1.5">
             <Info className="w-3 h-3" />
             <span>Waiting for input...</span>
@@ -195,13 +198,18 @@ export function ConsolePanel({ result, onStdinSubmit, waitingForInput, onClear }
                 }
               }}
             />
-            <button
+            {/* Submit CTA in the accent specular language (primary action),
+                form type=submit preserved; same h-8 scale as Run. */}
+            <SpecularCta
               type="submit"
-              className="px-3 py-1.5 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold text-sm transition-colors active:scale-[0.96] flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              variant="accent"
+              size="sm"
+              className="h-8 shrink-0"
+              style={{ padding: "0 12px" }}
             >
               <Send className="w-3 h-3" />
               Send
-            </button>
+            </SpecularCta>
           </form>
         </div>
       )}

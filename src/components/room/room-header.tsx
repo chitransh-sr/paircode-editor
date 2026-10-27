@@ -12,6 +12,7 @@ import { ThemeToggle } from "@/components/editor/theme-toggle";
 import { ModeToggle } from "@/components/editor/mode-toggle";
 import { WhiteboardToggle } from "@/components/editor/whiteboard-toggle";
 import { PairMark } from "@/components/landing-chrome";
+import SpecularCta from "@/components/specular-button/SpecularCta";
 
 interface RoomHeaderProps {
   room: Room;
@@ -224,18 +225,24 @@ export function RoomHeader({
         {onToggleWhiteboard && (
           <WhiteboardToggle open={whiteboardOpen} onToggle={onToggleWhiteboard} />
         )}
-        <button
+        {/* Primarily a labeled CTA (invite your candidate) — the room's
+            primary action, so accent like Run. Icon utilities around it
+            stay plain. `title` passes through to the specular button. */}
+        <SpecularCta
+          variant="accent"
+          size="sm"
+          className="h-8 shrink-0"
           onClick={copyLink}
-          className="p-2 hover:bg-foreground/[0.06] hover:text-foreground rounded-md transition-colors text-sm flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          style={{ padding: "0 8px" }}
           title="Share room link"
         >
           {copied ? (
-            <Check className="w-4 h-4 text-accent" />
+            <Check className="w-4 h-4" />
           ) : (
-            <Share2 className="w-4 h-4 text-muted-foreground" />
+            <Share2 className="w-4 h-4" />
           )}
-          {!isMobile && <span className="text-muted-foreground">Share</span>}
-        </button>
+          {!isMobile && <span>Share</span>}
+        </SpecularCta>
         {canManage && (
           <button
             onClick={() => setShowSettings(true)}

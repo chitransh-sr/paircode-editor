@@ -82,6 +82,18 @@ body {
   background: var(--color-border);
 }
 
+/* Overlay content (modal panels): content must still scroll on short
+   screens, but the themed scrollbar never paints. SpecularButton glow
+   canvases bleed their 24px halo, which leaves a phantom 1px scroll
+   range at the modal's border — that otherwise paints a false rail. */
+.modal-scroll {
+  scrollbar-width: none;
+}
+
+.modal-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 /* Monaco editor custom theme - JetBrains Mono */
 .monaco-editor {
   font-family: var(--font-mono, "JetBrains Mono", ui-monospace, 'Fira Code', monospace) !important;

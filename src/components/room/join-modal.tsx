@@ -7,6 +7,7 @@ import { getUserColor } from "@/lib/presence/colors";
 import { sanitizeStoredName } from "@/hooks/use-room";
 import { cn } from "@/lib/utils/cn";
 import { Corners } from "@/components/landing-chrome";
+import SpecularCta from "@/components/specular-button/SpecularCta";
 
 interface JoinModalProps {
   open: boolean;
@@ -49,7 +50,7 @@ export function JoinModal({ open, onJoin, defaultName }: JoinModalProps) {
     <>
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-5 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto">
+        <div className="group relative bg-card border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.55)] p-5 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto modal-scroll">
           <Corners />
           <div className="relative z-10">
             {/* Square accent plate + mono eyebrow (landing card header) */}
@@ -99,19 +100,10 @@ export function JoinModal({ open, onJoin, defaultName }: JoinModalProps) {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={!name.trim()}
-                className={cn(
-                  "w-full px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 transition-all active:scale-[0.98]",
-                  !name.trim()
-                    ? "bg-foreground/[0.06] text-muted-foreground border border-foreground/10 cursor-not-allowed"
-                    : "bg-accent text-accent-foreground hover:bg-accent/90 font-semibold shadow-[0_0_24px_-8px_rgba(34,197,94,0.6)]"
-                )}
-              >
+              <SpecularCta type="submit" className="w-full h-10" disabled={!name.trim()}>
                 <User className="w-4 h-4" />
                 Join Room
-              </button>
+              </SpecularCta>
             </form>
           </div>
         </div>
